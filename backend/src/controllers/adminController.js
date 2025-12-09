@@ -774,11 +774,56 @@ exports.updateWaliKelas = (req, res) => {
                 if (err) return res.status(500).json({ message: err.message });
                 if (!guru) return res.status(404).json({ message: 'Guru tidak ditemukan.' });
 
-                // Update the wali kelas
-                db.run("UPDATE Kelas SET id_wali_kelas = ? WHERE id_kelas = ?", [id_guru, id_kelas], function(err) {
-                    if (err) return res.status(400).json({ message: err.message });
-                    res.json({ message: `Wali kelas berhasil diubah menjadi ${guru.nama_guru}.` });
-                });
+                // Get the 5 core subjects (Bahasa Indonesia, Matematika, IPA, Life Skills, Citizenship)
+                const coreSubjects = ['Bahasa Indonesia', 'Matematika', 'IPA', 'Life Skills', 'Citizenship'];
+                
+                db.all(
+                    `SELECT id_mapel FROM MataPelajaran WHERE nama_mapel IN ('${coreSubjects.join("','")}')`,
+                    [],
+                    (err, mapelList) => {
+                        if (err) return res.status(500).json({ message: err.message });
+
+                        // Update the wali kelas
+                        db.run("UPDATE Kelas SET id_wali_kelas = ? WHERE id_kelas = ?", [id_guru, id_kelas], function(err) {
+                            if (err) return res.status(400).json({ message: err.message });
+
+                            // Auto-assign guru to core subjects for this class
+                            let assignedCount = 0;
+                            let successCount = 0;
+
+                            if (mapelList.length > 0) {
+                                mapelList.forEach((mapel) => {
+                                    db.run(
+                                        `INSERT INTO GuruMataPelajaranKelas (id_guru, id_mapel, id_kelas, id_ta_semester, is_wali_kelas)
+                                         VALUES (?, ?, ?, ?, 1)
+                                         ON CONFLICT(id_guru, id_mapel, id_kelas, id_ta_semester) DO UPDATE SET is_wali_kelas = 1`,
+                                        [id_guru, mapel.id_mapel, id_kelas, kelas.id_ta_semester],
+                                        function(err) {
+                                            assignedCount++;
+                                            if (!err) {
+                                                successCount++;
+                                            }
+
+                                            // Send response after all assignments are processed
+                                            if (assignedCount === mapelList.length) {
+                                                res.json({ 
+                                                    message: `Wali kelas berhasil diubah menjadi ${guru.nama_guru}. Auto-assigned ke ${successCount} mata pelajaran wajib.`,
+                                                    assignedSubjects: successCount
+                                                });
+                                            }
+                                        }
+                                    );
+                                });
+                            } else {
+                                // If core subjects not found, return warning
+                                res.json({ 
+                                    message: `Wali kelas berhasil diubah menjadi ${guru.nama_guru}. (Mata pelajaran wajib tidak ditemukan di database)`,
+                                    assignedSubjects: 0
+                                });
+                            }
+                        });
+                    }
+                );
             });
         } else {
             // Remove wali kelas (set to null)
