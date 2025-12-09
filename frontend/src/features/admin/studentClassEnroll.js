@@ -105,7 +105,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
   useEffect(() => {
     fetchStudentsInKelas(selectedKelasId, activeTASemester?.id_ta_semester);
     fetchAllStudentsInSemester(activeTASemester?.id_ta_semester);
-  }, [selectedKelasId, activeTASemester, students, kelas]);
+  }, [selectedKelasId, activeTASemester, kelas]);
 
   const showMessage = (text, type = 'success') => {
     setMessage(text);
@@ -179,6 +179,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
         showMessage(`Successfully assigned ${successCount} students to the class.`, 'success');
         setSelectedStudents([]);
         fetchStudentsInKelas(selectedKelasId, activeTASemester.id_ta_semester);
+        fetchAllStudentsInSemester(activeTASemester.id_ta_semester);
       } else if (failCount > 0) {
         showMessage(`Failed to assign ${failCount} students. They might already be enrolled.`, 'error');
       }
@@ -207,6 +208,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
       console.log('Remove response:', response);
       showMessage(`Successfully removed "${student.nama_siswa}" from class.`, 'success');
       fetchStudentsInKelas(selectedKelasId, activeTASemester.id_ta_semester);
+      fetchAllStudentsInSemester(activeTASemester.id_ta_semester);
     } catch (err) {
       console.error('Remove error:', err);
       showMessage(`Failed to remove student: ${err.message}`, 'error');
