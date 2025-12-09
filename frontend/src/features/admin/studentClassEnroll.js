@@ -198,8 +198,24 @@ const StudentClassEnroll = ({ activeTASemester }) => {
 
   const confirmRemoveStudent = async () => {
     const { student } = deleteConfirm;
-    console.log('Attempting to remove student:', { student, selectedKelasId, taSemesterId: activeTASemester?.id_ta_semester });
+    console.log('confirmRemoveStudent called');
+    console.log('deleteConfirm.student:', deleteConfirm.student);
+    console.log('selectedKelasId:', selectedKelasId);
+    console.log('activeTASemester:', activeTASemester);
+    
+    if (!student || !selectedKelasId || !activeTASemester) {
+      console.error('Missing required data', { student, selectedKelasId, activeTASemester });
+      showMessage('Error: Missing required data', 'error');
+      return;
+    }
+    
     try {
+      console.log('Calling unassignSiswaFromKelas with:', {
+        id_siswa: student.id_siswa,
+        id_kelas: selectedKelasId,
+        id_ta_semester: activeTASemester.id_ta_semester
+      });
+      
       const response = await adminApi.unassignSiswaFromKelas({
         id_siswa: student.id_siswa,
         id_kelas: selectedKelasId,
@@ -241,6 +257,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
       
       // Refresh data
       fetchStudentsInKelas(selectedKelasId, activeTASemester?.id_ta_semester);
+      fetchAllStudentsInSemester(activeTASemester?.id_ta_semester);
       event.target.value = '';
     } catch (err) {
       showMessage('Gagal import: ' + err.message, 'error');
