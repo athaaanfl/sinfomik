@@ -335,29 +335,42 @@ exports.deleteTASemester = (req, res) => {
             // Delete semua data yang berhubungan (cascade)
             // 1. Delete Nilai (grades)
             db.run(`
-                DELETE FROM Nilai WHERE id_penugasan IN (
-                    SELECT id_penugasan FROM GuruMataPelajaranKelas WHERE id_ta_semester = ?
-                )
+                DELETE FROM Nilai WHERE id_ta_semester = ?
             `, [id], (err) => {
                 if (err) return res.status(500).json({ message: err.message });
                 
-                // 2. Delete GuruMataPelajaranKelas (teacher assignments)
-                db.run("DELETE FROM GuruMataPelajaranKelas WHERE id_ta_semester = ?", [id], (err) => {
+                // 2. Delete SiswaCapaianPembelajaran
+                db.run("DELETE FROM SiswaCapaianPembelajaran WHERE id_ta_semester = ?", [id], (err) => {
                     if (err) return res.status(500).json({ message: err.message });
                     
-                    // 3. Delete SiswaKelas (student class enrollments)
-                    db.run("DELETE FROM SiswaKelas WHERE id_ta_semester = ?", [id], (err) => {
+                    // 3. Delete KKM_Settings
+                    db.run("DELETE FROM KKM_Settings WHERE id_ta_semester = ?", [id], (err) => {
                         if (err) return res.status(500).json({ message: err.message });
                         
-                        // 4. Delete Kelas (classes)
-                        db.run("DELETE FROM Kelas WHERE id_ta_semester = ?", [id], (err) => {
-                            if (err) return res.status(500).json({ message: err.message });
+                        // 4. Delete manual_tp (if table exists)
+                        db.run("DELETE FROM manual_tp WHERE id_ta_semester = ?", [id], (err) => {
+                            // Ignore error if table doesn't exist
                             
-                            // 5. Delete TahunAjaranSemester
-                            db.run("DELETE FROM TahunAjaranSemester WHERE id_ta_semester = ?", [id], function(err) {
+                            // 5. Delete GuruMataPelajaranKelas (teacher assignments)
+                            db.run("DELETE FROM GuruMataPelajaranKelas WHERE id_ta_semester = ?", [id], (err) => {
                                 if (err) return res.status(500).json({ message: err.message });
-                                if (this.changes === 0) return res.status(404).json({ message: 'Tahun Ajaran & Semester tidak ditemukan.' });
-                                res.json({ message: 'Tahun Ajaran & Semester dan semua data terkait berhasil dihapus.' });
+                                
+                                // 6. Delete SiswaKelas (student class enrollments)
+                                db.run("DELETE FROM SiswaKelas WHERE id_ta_semester = ?", [id], (err) => {
+                                    if (err) return res.status(500).json({ message: err.message });
+                                    
+                                    // 7. Delete Kelas (classes)
+                                    db.run("DELETE FROM Kelas WHERE id_ta_semester = ?", [id], (err) => {
+                                        if (err) return res.status(500).json({ message: err.message });
+                                        
+                                        // 8. Delete TahunAjaranSemester
+                                        db.run("DELETE FROM TahunAjaranSemester WHERE id_ta_semester = ?", [id], function(err) {
+                                            if (err) return res.status(500).json({ message: err.message });
+                                            if (this.changes === 0) return res.status(404).json({ message: 'Tahun Ajaran & Semester tidak ditemukan.' });
+                                            res.json({ message: 'Tahun Ajaran & Semester dan semua data terkait berhasil dihapus.' });
+                                        });
+                                    });
+                                });
                             });
                         });
                     });

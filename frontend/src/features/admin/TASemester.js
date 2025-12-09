@@ -23,6 +23,8 @@ const TASemesterManagement = ({ activeTASemester, setActiveTASemester }) => {
     isOpen: false,
     title: '',
     message: '',
+    confirmText: 'Ya, Konfirmasi',
+    variant: 'info',
     onConfirm: null
   });
 
@@ -79,6 +81,8 @@ const TASemesterManagement = ({ activeTASemester, setActiveTASemester }) => {
       isOpen: true,
       title: 'Konfirmasi Aktivasi',
       message: `Apakah Anda yakin ingin mengaktifkan "${selectedTA.tahun_ajaran} - ${selectedTA.semester}"? Tahun ajaran yang aktif saat ini akan dinonaktifkan.`,
+      confirmText: 'Ya, Aktifkan',
+      variant: 'info',
       onConfirm: async () => {
         setMessage('');
         setMessageType('');
@@ -111,6 +115,7 @@ const TASemesterManagement = ({ activeTASemester, setActiveTASemester }) => {
       isOpen: true,
       title: 'Hapus Tahun Ajaran & Semester',
       message: `Apakah Anda yakin akan menghapus tahun ajaran terkait? Semua data yang berhubungan dengan tahun ajaran tersebut akan di hapus secara permanen.\n\n"${selectedTA.tahun_ajaran} - ${selectedTA.semester}"`,
+      confirmText: 'Ya, Hapus',
       variant: 'danger',
       onConfirm: async () => {
         setMessage('');
@@ -276,8 +281,9 @@ const TASemesterManagement = ({ activeTASemester, setActiveTASemester }) => {
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
         message={confirmDialog.message}
-        confirmText="Ya, Aktifkan"
-        variant="info"
+        confirmText={confirmDialog.confirmText}
+        cancelText="Batal"
+        variant={confirmDialog.variant}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
