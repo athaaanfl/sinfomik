@@ -271,6 +271,8 @@ exports.getGuruAnalytics = async (req, res) => {
                 m.nama_mapel,
                 k.id_kelas,
                 k.nama_kelas,
+                s.id_siswa,
+                s.nama_siswa,
                 tas.id_ta_semester,
                 tas.tahun_ajaran,
                 tas.semester,
@@ -285,11 +287,14 @@ exports.getGuruAnalytics = async (req, res) => {
             JOIN MataPelajaran m ON gmpk.id_mapel = m.id_mapel
             JOIN Kelas k ON gmpk.id_kelas = k.id_kelas
             JOIN TahunAjaranSemester tas ON gmpk.id_ta_semester = tas.id_ta_semester
+            LEFT JOIN SiswaKelas sk ON k.id_kelas = sk.id_kelas AND tas.id_ta_semester = sk.id_ta_semester
+            LEFT JOIN Siswa s ON sk.id_siswa = s.id_siswa
             LEFT JOIN Nilai n ON 
                 n.id_guru = g.id_guru AND 
                 n.id_mapel = m.id_mapel AND 
                 n.id_kelas = k.id_kelas AND
-                n.id_ta_semester = tas.id_ta_semester
+                n.id_ta_semester = tas.id_ta_semester AND
+                (s.id_siswa IS NULL OR n.id_siswa = s.id_siswa)
             WHERE g.id_guru = ?
         `;
 
@@ -311,8 +316,8 @@ exports.getGuruAnalytics = async (req, res) => {
         }
 
         query += `
-            GROUP BY g.id_guru, m.id_mapel, k.id_kelas, tas.tahun_ajaran, tas.semester
-            ORDER BY tas.tahun_ajaran, tas.semester, m.nama_mapel, k.nama_kelas
+            GROUP BY g.id_guru, m.id_mapel, k.id_kelas, s.id_siswa, tas.tahun_ajaran, tas.semester
+            ORDER BY tas.tahun_ajaran, tas.semester, m.nama_mapel, k.nama_kelas, s.nama_siswa
         `;
 
         db.all(query, params, (err, rows) => {

@@ -30,8 +30,9 @@ const GuruAnalytics = ({ idGuru }) => {
     const [studentId, setStudentId] = useState('');
     const [studentData, setStudentData] = useState(null);
     const [selectedMapelStudent, setSelectedMapelStudent] = useState('all');
+    const [studentList, setStudentList] = useState([]);
 
-    // Extract unique mapel and kelas from guru data
+    // Extract unique mapel, kelas, and siswa from guru data
     useEffect(() => {
         if (guruData.length > 0) {
             const mapelMap = new Map();
@@ -46,9 +47,23 @@ const GuruAnalytics = ({ idGuru }) => {
                     kelasMap.set(item.id_kelas, { id: item.id_kelas, nama: item.nama_kelas });
                 }
             });
+            // Extract unique students from the kelas guru ajar
+            const siswaMap = new Map();
+            guruData.forEach(item => {
+                if (item.id_siswa && item.nama_siswa) {
+                    if (!siswaMap.has(item.id_siswa)) {
+                        siswaMap.set(item.id_siswa, { 
+                            id: item.id_siswa, 
+                            nama: item.nama_siswa,
+                            kelas: item.nama_kelas
+                        });
+                    }
+                }
+            });
 
             const uniqueMapel = Array.from(mapelMap.values());
             const uniqueKelas = Array.from(kelasMap.values());
+            const uniqueSiswa = Array.from(siswaMap.values()).sort((a, b) => a.nama.localeCompare(b.nama));
 
             const allowedMapelSet = new Set(ALLOWED_MAPEL_WALI.map(normalizeName));
             const allowedClassSet = new Set(SCHOOL_CLASSES.map(normalizeName));
@@ -58,6 +73,7 @@ const GuruAnalytics = ({ idGuru }) => {
 
             setMataPelajaranList(filteredMapel);
             setKelasList(filteredKelas);
+            setStudentList(uniqueSiswa);
         }
     }, [guruData]);
 
@@ -456,16 +472,25 @@ const GuruAnalytics = ({ idGuru }) => {
                         <div className="grid grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    <i className="fas fa-id-card mr-2 text-purple-500"></i>
-                                    ID Siswa
+                                    <i className="fas fa-user-graduate mr-2 text-purple-500"></i>
+                                    Pilih Siswa
                                 </label>
-                                <input
-                                    type="number"
-                                    placeholder="Masukkan ID Siswa"
+                                <select
                                     value={studentId}
                                     onChange={(e) => setStudentId(e.target.value)}
                                     className="input-field w-full"
-                                />
+                                >
+                                    <option value="">-- Pilih Siswa --</option>
+                                    {studentList.length > 0 ? (
+                                        studentList.map((siswa, idx) => (
+                                            <option key={idx} value={siswa.id}>
+                                                {siswa.nama} ({siswa.kelas})
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <option disabled>Tidak ada siswa ditemukan</option>
+                                    )}
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
