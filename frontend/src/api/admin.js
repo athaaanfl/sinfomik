@@ -19,12 +19,23 @@ const fetchData = async (url, options = {}) => {
       const last = window.__lastAuthRedirect || 0;
       if (now - last > 5000) {
         window.__lastAuthRedirect = now;
+        
+        // Try to get response body for detailed error info
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Clear session data
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('userRole');
         localStorage.removeItem('username');
         localStorage.removeItem('userId');
+        
+        // Handle session invalidation from other device
+        if (errorData.sessionInvalidated) {
+          throw new Error(errorData.message || 'Session logged in from another device. Please login again.');
+        }
+        
         window.location.replace('/login');
       }
       throw new Error('Session expired');

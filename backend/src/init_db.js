@@ -17,7 +17,8 @@ function initializeDatabase() {
             id_admin INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
-            nama TEXT NOT NULL
+            nama TEXT NOT NULL,
+            last_login_timestamp INTEGER
         );
 
         CREATE TABLE IF NOT EXISTS Guru (
@@ -25,7 +26,8 @@ function initializeDatabase() {
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             nama_guru TEXT NOT NULL,
-            email TEXT UNIQUE
+            email TEXT UNIQUE,
+            last_login_timestamp INTEGER
         );
 
         CREATE TABLE IF NOT EXISTS Siswa (

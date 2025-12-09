@@ -3,8 +3,10 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'sinfomik_super_secret_key_2025_change_in_production_please';
 
-// Middleware to verify JWT token
+// Middleware to verify JWT token with single-session enforcement
 exports.verifyToken = (req, res, next) => {
+    const { getDb } = require('../config/db');
+    
     // Get token from header
     const token = req.headers['authorization']?.split(' ')[1]; // Expected format: "Bearer <token>"
     
@@ -18,15 +20,58 @@ exports.verifyToken = (req, res, next) => {
     try {
         // Verify token
         const decoded = jwt.verify(token, JWT_SECRET);
+        console.log(`[SESSION] Token decoded - User: ${decoded.id}, Type: ${decoded.user_type}, Token IAT: ${decoded.iat}`);
         
-        // Add user info to request
-        req.user = {
-            id: decoded.id,
-            user_type: decoded.user_type,
-            nama: decoded.nama
-        };
+        // Validate single session: check if this token is still the latest session
+        const db = getDb();
+        const tableName = decoded.user_type === 'admin' ? 'Admin' : 'Guru';
+        const idField = decoded.user_type === 'admin' ? 'id_admin' : 'id_guru';
         
-        next();
+        db.get(
+            `SELECT last_login_timestamp FROM ${tableName} WHERE ${idField} = ?`,
+            [decoded.id],
+            (err, row) => {
+                if (err) {
+                    console.error('Session validation error:', err);
+                    return res.status(500).json({ message: 'Session validation failed.' });
+                }
+                
+                console.log(`[SESSION] DB last_login_timestamp: ${row ? row.last_login_timestamp : 'N/A'}`);
+                
+                // If no last_login_timestamp, allow (backward compatibility)
+                if (!row || !row.last_login_timestamp) {
+                    console.log(`[SESSION] ✓ No timestamp found - allowing (backward compatibility)`);
+                    req.user = {
+                        id: decoded.id,
+                        user_type: decoded.user_type,
+                        nama: decoded.nama
+                    };
+                    return next();
+                }
+                
+                // Compare token issued-at time with last_login_timestamp
+                // If token was issued BEFORE last login, it's an old session
+                console.log(`[SESSION] Comparing - Token IAT: ${decoded.iat}, DB Timestamp: ${row.last_login_timestamp}, Diff: ${decoded.iat - row.last_login_timestamp}s`);
+                
+                if (decoded.iat < row.last_login_timestamp) {
+                    console.log(`[SESSION] ❌ OLD SESSION - Token was issued before last login. Rejecting!`);
+                    return res.status(401).json({ 
+                        message: 'This session has been logged out. You logged in from another device. Please login again.',
+                        requiresAuth: true,
+                        sessionInvalidated: true
+                    });
+                }
+                
+                console.log(`[SESSION] ✓ Valid session - Token is latest`);
+                // Token is valid and latest session
+                req.user = {
+                    id: decoded.id,
+                    user_type: decoded.user_type,
+                    nama: decoded.nama
+                };
+                next();
+            }
+        );
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
             return res.status(401).json({ 
