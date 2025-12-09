@@ -316,8 +316,8 @@ exports.getGuruAnalytics = async (req, res) => {
         }
 
         query += `
-            GROUP BY g.id_guru, m.id_mapel, k.id_kelas, s.id_siswa, tas.tahun_ajaran, tas.semester
-            ORDER BY tas.tahun_ajaran, tas.semester, m.nama_mapel, k.nama_kelas, s.nama_siswa
+            GROUP BY g.id_guru, m.id_mapel, k.id_kelas, tas.tahun_ajaran, tas.semester
+            ORDER BY tas.tahun_ajaran, tas.semester, m.nama_mapel, k.nama_kelas
         `;
 
         db.all(query, params, (err, rows) => {
