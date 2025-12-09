@@ -40,14 +40,17 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
 
   const fetchWaliKelasClassList = useCallback(async () => {
     try {
-      if (!userId || !activeTASemester) return;
+      if (!userId || !activeTASemester) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       const classes = await guruApi.getWaliKelasClassList(userId, activeTASemester.id_ta_semester);
       setClassList(classes);
+      setLoading(false);
       
       if (classes.length === 0) {
-        // Guru bukan wali kelas
-        setLoading(false);
+        // Guru bukan wali kelas - langsung stop loading
         return;
       }
       
@@ -57,6 +60,7 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
     } catch (err) {
       console.error('Error fetching wali kelas class list:', err);
       setError('Gagal memuat data wali kelas. Silakan coba lagi.');
+      setClassList([]);
       setLoading(false);
     }
   }, [userId, activeTASemester, selectedClass]);
