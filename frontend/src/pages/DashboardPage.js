@@ -17,7 +17,7 @@ import InputNilai from '../features/guru/inputNilai';
 import RekapNilai from '../features/guru/rekapNilai';
 // import PenilaianCapaianPembelajaran from '../features/guru/cp'; // DISABLED - Fitur dihilangkan
 import WaliKelasGradeView from '../features/guru/WaliKelasGradeView';
-import GuruAnalytics from '../features/guru/analytics';
+// import GuruAnalytics from '../features/guru/analytics'; // DISABLED - Merged into WaliKelasGradeView
 import ChangePassword from '../features/guru/changePassword';
 
 import * as adminApi from '../api/admin';
@@ -119,7 +119,7 @@ function DashboardPage({ userRole, username, userId, onLogout }) {
         { name: "Rekap Nilai", key: "rekap-nilai", component: RekapNilai, icon: "fas fa-chart-bar" },
         // { name: "Penilaian CP", key: "penilaian-cp", component: PenilaianCapaianPembelajaran, icon: "fas fa-check-circle" }, // DISABLED
         { name: "Nilai Kelas Wali", key: "nilai-kelas-wali", component: WaliKelasGradeView, icon: "fas fa-eye" },
-        { name: "Analytics Kelas", key: "analytics-guru", component: () => <GuruAnalytics idGuru={userId} />, icon: "fas fa-chart-line" },
+        // { name: "Analytics Kelas", key: "analytics-guru", component: () => <GuruAnalytics idGuru={userId} />, icon: "fas fa-chart-line" }, // DISABLED - Use Nilai Kelas Wali instead
         { name: "Ganti Password", key: "ganti-password", component: ChangePassword, icon: "fas fa-key" },
     ];
 
