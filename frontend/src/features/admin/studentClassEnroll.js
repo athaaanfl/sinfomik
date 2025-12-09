@@ -35,7 +35,19 @@ const StudentClassEnroll = ({ activeTASemester }) => {
         adminApi.getStudents(),
         activeTASemester ? adminApi.getKelas(activeTASemester.id_ta_semester) : Promise.resolve([])
       ]);
-      setStudents(studentsData);
+      
+      // Filter siswa yang tahun masuknya <= tahun ajaran semester aktif
+      let validStudents = studentsData;
+      if (activeTASemester) {
+        validStudents = studentsData.filter(s => {
+          const tahunMasuk = parseInt(s.tahun_ajaran_masuk);
+          const tahunAjaran = parseInt(activeTASemester.tahun_ajaran);
+          return tahunMasuk <= tahunAjaran;
+        });
+        console.log(`Filtered students: ${validStudents.length} dari ${studentsData.length} (TA ${activeTASemester.tahun_ajaran})`);
+      }
+      
+      setStudents(validStudents);
       setKelas(kelasData);
       if (kelasData.length > 0 && !selectedKelasId) {
         setSelectedKelasId(kelasData[0].id_kelas);
@@ -46,6 +58,8 @@ const StudentClassEnroll = ({ activeTASemester }) => {
       setLoading(false);
     }
   };
+
+  const [allStudentsInSemester, setAllStudentsInSemester] = useState([]);
 
   const fetchStudentsInKelas = async (kelasId, taSemesterId) => {
     if (!kelasId || !taSemesterId) {
@@ -61,13 +75,37 @@ const StudentClassEnroll = ({ activeTASemester }) => {
     }
   };
 
+  const fetchAllStudentsInSemester = async (taSemesterId) => {
+    if (!taSemesterId || kelas.length === 0) {
+      setAllStudentsInSemester([]);
+      return;
+    }
+    try {
+      // Fetch all students enrolled in ANY class for this semester
+      const allKelasIds = kelas.map(k => k.id_kelas);
+      const allEnrolledIds = new Set();
+      
+      for (const kelasId of allKelasIds) {
+        const studentsInKelas = await adminApi.getSiswaInKelas(kelasId, taSemesterId);
+        studentsInKelas.forEach(s => allEnrolledIds.add(s.id_siswa));
+      }
+      
+      console.log('All enrolled students in semester:', Array.from(allEnrolledIds));
+      setAllStudentsInSemester(Array.from(allEnrolledIds));
+    } catch (err) {
+      console.error("Error fetching all students in semester:", err);
+      setAllStudentsInSemester([]);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [activeTASemester]);
 
   useEffect(() => {
     fetchStudentsInKelas(selectedKelasId, activeTASemester?.id_ta_semester);
-  }, [selectedKelasId, activeTASemester, students]);
+    fetchAllStudentsInSemester(activeTASemester?.id_ta_semester);
+  }, [selectedKelasId, activeTASemester, students, kelas]);
 
   const showMessage = (text, type = 'success') => {
     setMessage(text);
@@ -90,7 +128,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
   };
 
   const availableStudents = students.filter(s =>
-    !studentsInSelectedKelas.some(sisInKelas => sisInKelas.id_siswa === s.id_siswa)
+    !allStudentsInSemester.includes(s.id_siswa)
   );
 
   const filteredAvailableStudents = availableStudents.filter(student =>
@@ -152,20 +190,25 @@ const StudentClassEnroll = ({ activeTASemester }) => {
   };
 
   const handleRemoveClick = (student) => {
+    console.log('handleRemoveClick called with student:', student);
     setDeleteConfirm({ show: true, student });
+    console.log('deleteConfirm state should be updated now');
   };
 
   const confirmRemoveStudent = async () => {
     const { student } = deleteConfirm;
+    console.log('Attempting to remove student:', { student, selectedKelasId, taSemesterId: activeTASemester?.id_ta_semester });
     try {
-      await adminApi.unassignSiswaFromKelas({
+      const response = await adminApi.unassignSiswaFromKelas({
         id_siswa: student.id_siswa,
         id_kelas: selectedKelasId,
         id_ta_semester: activeTASemester.id_ta_semester
       });
+      console.log('Remove response:', response);
       showMessage(`Successfully removed "${student.nama_siswa}" from class.`, 'success');
       fetchStudentsInKelas(selectedKelasId, activeTASemester.id_ta_semester);
     } catch (err) {
+      console.error('Remove error:', err);
       showMessage(`Failed to remove student: ${err.message}`, 'error');
     } finally {
       setDeleteConfirm({ show: false, student: null });
@@ -479,16 +522,23 @@ const StudentClassEnroll = ({ activeTASemester }) => {
                   <Table
                     columns={enrolledStudentsColumns}
                     data={studentsInSelectedKelas}
-                    actions={(student) => (
-                      <Button
-                        variant="danger"
-                        icon="user-minus"
-                        size="sm"
-                        onClick={() => handleRemoveClick(student)}
-                      >
-                        Remove
-                      </Button>
-                    )}
+                    actions={(student) => {
+                      console.log('Rendering action for student:', student);
+                      return (
+                        <Button
+                          variant="danger"
+                          icon="user-minus"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log('Remove clicked for:', student);
+                            handleRemoveClick(student);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      );
+                    }}
                   />
                 ) : (
                   <EmptyState
@@ -625,15 +675,22 @@ const StudentClassEnroll = ({ activeTASemester }) => {
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirm.show && (
-        <ConfirmDialog
-          title="Remove Student from Class"
-          message={`Are you sure you want to remove "${deleteConfirm.student?.nama_siswa}" from this class? All existing grades will be kept, and the student can be re-enrolled later.`}
-          confirmText="Remove"
-          cancelText="Cancel"
-          onConfirm={confirmRemoveStudent}
-          onCancel={() => setDeleteConfirm({ show: false, student: null })}
-          variant="danger"
-        />
+        <>
+          {console.log('ConfirmDialog rendering with deleteConfirm:', deleteConfirm)}
+          <ConfirmDialog
+            show={deleteConfirm.show}
+            title="Remove Student from Class"
+            message={`Are you sure you want to remove "${deleteConfirm.student?.nama_siswa}" from this class? All existing grades will be kept, and the student can be re-enrolled later.`}
+            confirmText="Remove"
+            cancelText="Cancel"
+            onConfirm={confirmRemoveStudent}
+            onCancel={() => {
+              console.log('Cancel button clicked');
+              setDeleteConfirm({ show: false, student: null });
+            }}
+            variant="danger"
+          />
+        </>
       )}
     </ModuleContainer>
   );

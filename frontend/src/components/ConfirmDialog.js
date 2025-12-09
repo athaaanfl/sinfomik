@@ -7,6 +7,7 @@ import Button from './Button';
  */
 const ConfirmDialog = ({ 
   isOpen,
+  show,
   title = 'Konfirmasi',
   message,
   confirmText = 'Ya, Hapus',
@@ -15,7 +16,10 @@ const ConfirmDialog = ({
   onCancel,
   variant = 'danger' // 'danger', 'warning', 'info'
 }) => {
-  if (!isOpen) return null;
+  // Support both isOpen and show props for flexibility
+  const open = isOpen !== undefined ? isOpen : show;
+  
+  if (!open) return null;
 
   const iconClasses = {
     danger: 'fas fa-exclamation-triangle text-red-600 text-5xl',

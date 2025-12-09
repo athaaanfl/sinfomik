@@ -159,7 +159,8 @@ const StudentManagement = () => {
     id_siswa: '',
     nama_siswa: '',
     tanggal_lahir: '',
-    jenis_kelamin: 'L'
+    jenis_kelamin: 'L',
+    tahun_ajaran_masuk: new Date().getFullYear().toString()
   });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
@@ -207,14 +208,15 @@ const StudentManagement = () => {
     }
     
     try {
-      const { id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin } = newStudent;
-      const response = await adminApi.addStudent({ id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin });
+      const { id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk } = newStudent;
+      const response = await adminApi.addStudent({ id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk });
       showMessage(response.message);
       setNewStudent({
         id_siswa: '',
         nama_siswa: '',
         tanggal_lahir: '',
-        jenis_kelamin: 'L'
+        jenis_kelamin: 'L',
+        tahun_ajaran_masuk: new Date().getFullYear().toString()
       });
       fetchStudents(); // Refresh daftar
     } catch (err) {
@@ -385,6 +387,21 @@ const StudentManagement = () => {
                 <option value="L">Laki-Laki</option>
                 <option value="P">Perempuan</option>
               </select>
+            </div>
+            <div className="form-group">
+              <label>
+                <i className="fas fa-calendar-alt mr-2 text-gray-500"></i>
+                Tahun Ajaran Masuk
+              </label>
+              <input 
+                type="number" 
+                value={newStudent.tahun_ajaran_masuk}
+                onChange={(e) => setNewStudent({ ...newStudent, tahun_ajaran_masuk: e.target.value })}
+                required
+                placeholder="Contoh: 2023"
+                min={2020}
+                max={new Date().getFullYear()}
+              />
             </div>
             <div className="md:col-span-2">
               <Button

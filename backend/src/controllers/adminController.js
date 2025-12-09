@@ -948,23 +948,41 @@ exports.promoteStudents = (req, res) => {
     let insertedCount = 0;
     let failedCount = 0;
 
+    console.log('📋 Promote request received:', {
+        studentCount: student_ids ? student_ids.length : 0,
+        targetClass: target_kelas_id,
+        targetSemester: target_ta_semester_id,
+        studentIds: student_ids
+    });
+
+    if (!student_ids || !Array.isArray(student_ids) || student_ids.length === 0) {
+        return res.status(400).json({ message: 'student_ids harus berupa array yang tidak kosong' });
+    }
+
+    if (!target_kelas_id || !target_ta_semester_id) {
+        return res.status(400).json({ message: 'target_kelas_id dan target_ta_semester_id diperlukan' });
+    }
+
     // Menggunakan Promise.all untuk menangani operasi database asinkron dalam loop
     const promises = student_ids.map(id_siswa => {
         return new Promise((resolve, reject) => {
+            // Insert into new class while keeping old records for history/tracking
             db.run("INSERT INTO SiswaKelas (id_siswa, id_kelas, id_ta_semester) VALUES (?, ?, ?)",
                 [id_siswa, target_kelas_id, target_ta_semester_id],
                 function(err) {
                     if (err) {
                         if (err.message.includes('UNIQUE constraint failed')) {
-                            // console.warn(`Siswa ${id_siswa} sudah terdaftar di kelas tujuan.`);
-                            failedCount++; // Hitung sebagai gagal karena sudah ada
+                            // Siswa sudah terdaftar di kelas tujuan
+                            console.warn(`⚠️ Student ${id_siswa} sudah terdaftar di kelas ${target_kelas_id} semester ${target_ta_semester_id}`);
+                            failedCount++;
                             resolve(); // Tetap resolve agar Promise.all bisa lanjut
                         } else {
-                            console.error(`Error promoting student ${id_siswa}:`, err.message);
+                            console.error(`❌ Error promoting student ${id_siswa}:`, err.message);
                             failedCount++;
-                            reject(err); // Reject jika ada error lain
+                            reject(err);
                         }
                     } else {
+                        console.log(`✅ Student ${id_siswa} promoted successfully`);
                         insertedCount++;
                         resolve();
                     }
@@ -975,13 +993,16 @@ exports.promoteStudents = (req, res) => {
 
     Promise.all(promises)
         .then(() => {
+            const message = `Berhasil mempromosikan ${insertedCount} siswa. ${failedCount} siswa gagal atau sudah ada.`;
+            console.log('🎉 Promotion complete:', { insertedCount, failedCount });
             res.status(200).json({
-                message: `Berhasil mempromosikan ${insertedCount} siswa. ${failedCount} siswa gagal atau sudah ada.`,
+                message,
                 insertedCount,
                 failedCount
             });
         })
         .catch(error => {
+            console.error('💥 Promotion error:', error);
             res.status(500).json({ message: 'Gagal mempromosikan siswa: ' + error.message });
         });
 };

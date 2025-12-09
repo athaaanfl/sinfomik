@@ -19,7 +19,6 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
   const [selectedGuruId, setSelectedGuruId] = useState('');
   const [selectedMapelId, setSelectedMapelId] = useState('');
   const [selectedKelasId, setSelectedKelasId] = useState('');
-  const [isWaliKelas, setIsWaliKelas] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
@@ -89,11 +88,9 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
         id_guru: selectedGuruId,
         id_mapel: selectedMapelId,
         id_kelas: selectedKelasId,
-        id_ta_semester: activeTASemester.id_ta_semester,
-        is_wali_kelas: isWaliKelas
+        id_ta_semester: activeTASemester.id_ta_semester
       });
       showMessage(response.message, 'success');
-      setIsWaliKelas(false);
       fetchData();
     } catch (err) {
       showMessage(err.message, 'error');
@@ -234,10 +231,6 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
   const selectedTeacher = teachers.find(t => t.id_guru === selectedGuruId);
   const selectedSubject = mataPelajaran.find(mp => mp.id_mapel === selectedMapelId);
   const selectedClass = kelas.find(k => k.id_kelas === selectedKelasId);
-
-  const currentWaliKelas = selectedClass ? assignments.find(
-    a => a.id_kelas === selectedClass.id_kelas && a.is_wali_kelas === 1
-  ) : null;
 
   const renderGroupedAssignmentsCards = () => {
     const grouped = groupedAssignments();
@@ -545,50 +538,9 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
                           </div>
                           <span className="text-sm font-medium">{selectedClass.nama_kelas}</span>
                         </div>
-                        {isWaliKelas && (
-                          <>
-                            <i className="fas fa-arrow-right text-gray-400"></i>
-                            <div className="flex items-center">
-                              <div className="bg-gradient-to-br from-yellow-400 to-amber-500 p-2 rounded-lg mr-2">
-                                <i className="fas fa-home text-white text-sm"></i>
-                              </div>
-                              <span className="text-sm font-bold text-yellow-600">Wali Kelas</span>
-                            </div>
-                          </>
-                        )}
                       </div>
                     </div>
                   )}
-
-                  {/* Wali Kelas Checkbox */}
-                  <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-4 rounded-lg border border-yellow-200">
-                    <label className="flex items-center cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={isWaliKelas}
-                        onChange={(e) => setIsWaliKelas(e.target.checked)}
-                        disabled={currentWaliKelas && currentWaliKelas.id_guru !== selectedGuruId}
-                        className="w-5 h-5 text-yellow-600 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500 focus:ring-2"
-                      />
-                      <div className="ml-3 flex-1">
-                        <span className="text-sm font-semibold text-gray-700">
-                          <i className="fas fa-home mr-2"></i>
-                          Set as Wali Kelas (Homeroom Teacher)
-                        </span>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {currentWaliKelas && currentWaliKelas.id_guru !== selectedGuruId ? (
-                            <span className="text-orange-600 font-medium">
-                              ⚠️ {selectedClass?.nama_kelas} already has a wali kelas: <strong>{currentWaliKelas.nama_guru}</strong>
-                            </span>
-                          ) : isWaliKelas ? (
-                            'This teacher will be assigned as the homeroom teacher for this class'
-                          ) : (
-                            'Check this box to assign as homeroom teacher'
-                          )}
-                        </p>
-                      </div>
-                    </label>
-                  </div>
 
                   <Button
                     type="submit"
@@ -826,6 +778,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
       {/* Delete Confirmation Dialog */}
       {deleteConfirm.show && (
         <ConfirmDialog
+          show={deleteConfirm.show}
           title="Delete Teacher Assignment"
           message={`Are you sure you want to delete this assignment? Teacher: ${selectedTeacherDetail?.teacher.nama_guru}, Subject: ${deleteConfirm.assignment?.nama_mapel}, Class: ${deleteConfirm.assignment?.nama_kelas}`}
           confirmText="Delete"

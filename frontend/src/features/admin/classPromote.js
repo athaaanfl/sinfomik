@@ -128,12 +128,24 @@ const ClassPromote = () => {
 
   const handlePromoteStudents = async () => {
     const studentIdsToPromote = studentsInFromKelas.map(s => s.id_siswa);
+    console.log('🎓 Promoting students:', {
+      studentIds: studentIdsToPromote,
+      targetClass: toKelasId,
+      targetSemester: toTASemesterId,
+      totalStudents: studentIdsToPromote.length
+    });
 
     try {
       const response = await adminApi.promoteStudents(studentIdsToPromote, toKelasId, toTASemesterId);
+      console.log('✅ Promotion response:', response);
       showMessage(response.message, 'success');
-      fetchStudentsForPromotion();
+      
+      // Wait a moment then refresh data
+      setTimeout(() => {
+        fetchStudentsForPromotion();
+      }, 500);
     } catch (err) {
+      console.error('❌ Promotion error:', err);
       showMessage(err.message, 'error');
     } finally {
       setShowConfirm(false);
@@ -432,6 +444,7 @@ const ClassPromote = () => {
       {/* Confirmation Dialog */}
       {showConfirm && (
         <ConfirmDialog
+          show={showConfirm}
           title="Confirm Student Promotion"
           message={`Are you sure you want to promote ${studentsInFromKelas.length} student${studentsInFromKelas.length !== 1 ? 's' : ''} from ${fromClass?.nama_kelas} (${fromSemester?.tahun_ajaran} - ${fromSemester?.semester}) to ${toClass?.nama_kelas} (${toSemester?.tahun_ajaran} - ${toSemester?.semester})? This action will move all students to the new class.`}
           confirmText="Promote Students"
