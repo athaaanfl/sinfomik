@@ -21,7 +21,7 @@ function initializeDatabase() {
         );
 
         CREATE TABLE IF NOT EXISTS Guru (
-            id_guru INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_guru TEXT PRIMARY KEY,
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             nama_guru TEXT NOT NULL,
