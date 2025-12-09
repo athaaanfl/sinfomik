@@ -111,7 +111,7 @@ const GuruAnalytics = ({ idGuru }) => {
 
     const loadStudentAnalytics = async () => {
         if (!studentId) {
-            setError('Masukkan ID Siswa');
+            setError('Pilih siswa terlebih dahulu');
             return;
         }
 
