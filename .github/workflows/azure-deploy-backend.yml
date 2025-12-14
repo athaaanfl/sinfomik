@@ -36,7 +36,5 @@ jobs:
         publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_BACKEND }}
         package: './backend'
 
-    - name: Initialize database
-      run: |
-        curl -X POST https://sinfomik-backend-gzcng8eucydhgucz.southeastasia-01.azurewebsites.net/api/admin/init-db \
-          -H "Content-Type: application/json" || echo "Database init request sent"
+    # Database initialization is handled by the application on startup.
+    # Removed unauthenticated init step for security and reliability.
