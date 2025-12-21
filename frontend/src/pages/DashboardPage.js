@@ -110,7 +110,7 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
         { name: "Manajemen Capaian Pembelajaran", key: "manajemen-cp", component: CapaianPembelajaranManagement, icon: "fas fa-bullseye" },
         { name: "Penugasan Siswa ke Kelas", key: "penugasan-siswa-kelas", component: StudentClassEnroll, icon: "fas fa-user-graduate" },
         { name: "Penugasan Guru ke Mapel & Kelas", key: "penugasan-guru-mapel-kelas", component: TeacherClassEnroll, icon: "fas fa-tasks" },
-        { name: "Kenaikan Kelas", key: "kenaian-kelas", component: ClassPromote, icon: "fas fa-level-up-alt" },
+        { name: "Pindah Semester Kelas", key: "pindah-semester-kelas", component: ClassPromote, icon: "fas fa-level-up-alt" },
         { name: "Analytics & Laporan", key: "analytics", component: AdminAnalytics, icon: "fas fa-chart-line" },
     ];
 
@@ -118,7 +118,7 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
         { name: "Input Nilai", key: "input-nilai", component: InputNilai, icon: "fas fa-edit" },
         { name: "Rekap Nilai", key: "rekap-nilai", component: RekapNilai, icon: "fas fa-chart-bar" },
         // { name: "Penilaian CP", key: "penilaian-cp", component: PenilaianCapaianPembelajaran, icon: "fas fa-check-circle" }, // DISABLED
-        { name: "Nilai Kelas Wali", key: "nilai-kelas-wali", component: WaliKelasGradeView, icon: "fas fa-eye" },
+        { name: "Nilai Wali Kelas", key: "nilai-wali-kelas", component: WaliKelasGradeView, icon: "fas fa-eye" },
         // { name: "Analytics Kelas", key: "analytics-guru", component: () => <GuruAnalytics idGuru={userId} />, icon: "fas fa-chart-line" }, // DISABLED - Use Nilai Kelas Wali instead
         { name: "Ganti Password", key: "ganti-password", component: ChangePassword, icon: "fas fa-key" },
     ];

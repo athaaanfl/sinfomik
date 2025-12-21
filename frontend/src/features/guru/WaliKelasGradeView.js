@@ -28,6 +28,8 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
   const [error, setError] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentHistory, setStudentHistory] = useState(null);
+  // Radar display mode: 'current' (semester ini) or 'multi' (gabungan multi-semester)
+  const [radarMode, setRadarMode] = useState('current');
   const [processedData, setProcessedData] = useState({
     gradesPerSubjectTable: new Map(),
     summaryTableData: [],
@@ -231,10 +233,15 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
       rata_rata: student.overall_count > 0 ? parseFloat((student.overall_total / student.overall_count).toFixed(2)) : 0,
     })).sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa));
 
-    let gradesBySubjectChart = Array.from(subjectChartMap.entries()).map(([name, data]) => ({
-      nama_mapel: name,
-      rata_rata: data.count > 0 ? parseFloat((data.total_nilai / data.count).toFixed(2)) : 0,
-    })).sort((a, b) => a.nama_mapel.localeCompare(b.nama_mapel));
+    // Build gradesBySubjectChart using ALL subjects taught in the class
+    // so subjects without any recorded nilai will still show up (hasData=false)
+    const allSubjects = Array.from(finalGradesPerSubjectTable.keys()).sort();
+    let gradesBySubjectChart = allSubjects.map(name => {
+      const data = subjectChartMap.get(name);
+      const hasData = !!data && data.count > 0;
+      const rata = hasData ? parseFloat((data.total_nilai / data.count).toFixed(2)) : 0;
+      return { nama_mapel: name, rata_rata: rata, hasData };
+    });
 
     // Wali kelas bisa lihat semua mata pelajaran yang diajar di kelasnya
     const filteredGradesPerSubjectTable = finalGradesPerSubjectTable;
@@ -324,10 +331,36 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
     value: selectedStudent[`${subject}_RataRata`] !== null && selectedStudent[`${subject}_RataRata`] !== undefined ? selectedStudent[`${subject}_RataRata`] : 0,
   })) : [];
 
+  // Combined multi-semester radar data (average across all periods in studentHistory)
+  const radarCombinedData = (studentHistory && studentHistory.data && studentHistory.data.length > 0) ? (() => {
+    const map = new Map();
+    // accumulate totals and counts per mapel
+    studentHistory.data.forEach(item => {
+      const mapel = item.nama_mapel;
+      const val = parseFloat(item.rata_keseluruhan);
+      if (isNaN(val)) return;
+      if (!map.has(mapel)) map.set(mapel, { total: 0, count: 0 });
+      const cur = map.get(mapel);
+      cur.total += val;
+      cur.count += 1;
+    });
+
+    // use allSubjectNames so we keep consistent order and include subjects even if only present in current semester
+    const subjects = allSubjectNames.length ? allSubjectNames : Array.from(map.keys());
+    return subjects.map(subject => {
+      const entry = map.get(subject);
+      const value = entry && entry.count > 0 ? parseFloat((entry.total / entry.count).toFixed(2)) : (selectedStudent ? (selectedStudent[`${subject}_RataRata`] || 0) : 0);
+      return { subject, value };
+    });
+  })() : [];
+
   const totalStudents = processedData.summaryTableData.length; 
   const avgClassGrade = totalStudents > 0 
     ? (processedData.summaryTableData.reduce((sum, s) => sum + s.overall_final_average, 0) / totalStudents).toFixed(2)
     : 0;
+
+  // make bar chart taller when many subjects to avoid overcrowding
+  const subjectChartHeight = Math.max(300, (processedData.gradesBySubjectChart || []).length * 36);
   const studentsAbove75 = processedData.summaryTableData.filter(s => s.overall_final_average >= 75).length;
   const studentsBelow60 = processedData.summaryTableData.filter(s => s.overall_final_average < 60).length;
 
@@ -492,17 +525,27 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
                 <i className="fas fa-chart-bar mr-2 text-indigo-600"></i>
                 Rata-rata per Mata Pelajaran
               </h4>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={subjectChartHeight}>
                 <BarChart
                   data={processedData.gradesBySubjectChart}
                   layout="vertical"
-                  margin={{ top: 5, right: 30, left: 250, bottom: 5 }}
+                  // Reduce left margin and axis width so chart content aligns more to the left
+                  margin={{ top: 5, right: 30, left: 50, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" domain={[0, 100]} />
-                  <YAxis dataKey="nama_mapel" type="category" width={240} />
-                  <Tooltip />
-                  <Bar dataKey="rata_rata" fill="#00C49F" radius={[0, 8, 8, 0]} />
+                  {/* Decrease YAxis width to free up horizontal space */}
+                  <YAxis dataKey="nama_mapel" type="category" width={180} />
+                  <Tooltip formatter={(value, name, props) => {
+                    const payload = props && props.payload ? props.payload : {};
+                    if (payload && payload.hasData === false) return ['Belum ada nilai', 'Rata-rata'];
+                    return [value, 'Rata-rata'];
+                  }} />
+                  <Bar dataKey="rata_rata" radius={[0, 8, 8, 0]}>
+                    {processedData.gradesBySubjectChart.map((entry) => (
+                      <Cell key={`cell-${entry.nama_mapel}`} fill={entry.hasData ? '#00C49F' : '#e5e7eb'} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -516,7 +559,7 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
                 <PieChart>
                   <Pie
                     data={processedData.gradeDistributionChart}
-                    cx="50%"
+                    cx="50%"  // shift pie chart to the left
                     cy="50%"
                     outerRadius={100}
                     fill="#8884d8"
@@ -803,19 +846,25 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
               </div>
 
               <div className="mt-6 p-4 bg-white border rounded-lg shadow">
-                <h4 className="font-semibold text-gray-700 mb-4 flex items-center">
-                  <i className="fas fa-network-wired mr-2"></i>
-                  Profil Mata Pelajaran (Radar)
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-700 mb-4 flex items-center">
+                    <i className="fas fa-network-wired mr-2"></i>
+                    Profil Mata Pelajaran (Radar)
+                  </h4>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant={radarMode === 'current' ? 'primary' : 'ghost'} onClick={() => setRadarMode('current')}>Semester Ini</Button>
+                    <Button size="sm" variant={radarMode === 'multi' ? 'primary' : 'ghost'} onClick={() => setRadarMode('multi')} disabled={!studentHistory || !studentHistory.data || studentHistory.data.length === 0}>Semua Semester</Button>
+                  </div>
+                </div>
                 {allSubjectNames.length === 0 ? (
                   <div className="text-sm text-gray-600">Belum ada mata pelajaran untuk ditampilkan.</div>
                 ) : (
                   <ResponsiveContainer width="100%" height={350}>
-                    <RadarChart cx="50%" cy="50%" outerRadius={120} data={radarData}>
+                    <RadarChart cx="50%" cy="50%" outerRadius={120} data={radarMode === 'multi' ? radarCombinedData : radarData}>
                       <PolarGrid />
                       <PolarAngleAxis dataKey="subject" />
                       <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                      <Radar name={selectedStudent.nama_siswa} dataKey="value" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                      <Radar name={radarMode === 'multi' ? 'Semua Semester' : 'Semester Ini'} dataKey="value" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
                       <Tooltip />
                       <Legend />
                     </RadarChart>

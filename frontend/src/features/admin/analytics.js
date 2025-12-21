@@ -36,6 +36,8 @@ const AdminAnalytics = () => {
     const [schoolData, setSchoolData] = useState([]);
     const [selectedMapelSchool, setSelectedMapelSchool] = useState('all');
     const [mataPelajaranList, setMataPelajaranList] = useState([]);
+    // Rentang tahun ajaran (1..7) - default 1 tahun (mencakup Ganjil & Genap)
+    const [yearRange, setYearRange] = useState(1);
 
     // Angkatan analytics state
     const [angkatanData, setAngkatanData] = useState([]);
@@ -492,6 +494,19 @@ const AdminAnalytics = () => {
 
     const stats = calculateStats();
 
+    // Determine available tahun ajaran and apply yearRange filter (most recent years)
+    const parseStartYear = (y) => {
+        if (!y) return 0;
+        const m = String(y).match(/(\d{4})/);
+        return m ? parseInt(m[0], 10) : 0;
+    };
+    const distinctYears = Array.from(new Set(schoolData.map(i => i.tahun_ajaran))).sort((a, b) => parseStartYear(b) - parseStartYear(a));
+    const availableYearsCount = distinctYears.length;
+    const maxRange = Math.min(7, availableYearsCount || 7);
+    const effectiveYearRange = Math.min(yearRange, maxRange || yearRange);
+    const yearsToShow = distinctYears.slice(0, effectiveYearRange);
+    const filteredSchoolData = availableYearsCount === 0 ? schoolData : schoolData.filter(item => yearsToShow.includes(item.tahun_ajaran));
+
     return (
         <ModuleContainer>
             <PageHeader
@@ -625,6 +640,24 @@ const AdminAnalytics = () => {
                                     ))}
                                 </select>
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <i className="fas fa-calendar-alt mr-2 text-blue-500"></i>
+                                    Rentang Tahun Ajaran
+                                </label>
+                                <select
+                                    value={yearRange}
+                                    onChange={(e) => setYearRange(parseInt(e.target.value))}
+                                    className="input-field w-full"
+                                >
+                                    {[1,2,3,4,5,6,7].map(n => (
+                                        <option key={n} value={n} disabled={distinctYears.length > 0 && n > distinctYears.length}>{n} Tahun</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Pilih rentang tahun ajaran terakhir (maks 7)</p>
+                            </div>
+
                             <button
                                 onClick={loadSchoolAnalytics}
                                 disabled={loading}
@@ -679,7 +712,7 @@ const AdminAnalytics = () => {
                                                 </p>
                                             </div>
                                             <ResponsiveContainer width="100%" height={400}>
-                                                <BarChart data={prepareChartData(schoolData)}>
+                                                <BarChart data={prepareChartData(filteredSchoolData)}>
                                                     <CartesianGrid strokeDasharray="3 3" />
                                                     <XAxis 
                                                         dataKey="period" 
@@ -727,7 +760,7 @@ const AdminAnalytics = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
-                                        {schoolData
+                                        {filteredSchoolData
                                             .filter(item => selectedMapelSchool === 'all' || parseInt(item.id_mapel) === parseInt(selectedMapelSchool))
                                             .map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-gray-50 transition-colors">
@@ -1119,8 +1152,8 @@ const AdminAnalytics = () => {
                                                                         Tahun Ajaran: {groupInfo.period} | {groupItems.length} Mapel
                                                                     </p>
                                                                 </div>
-                                                                <div className="bg-white bg-opacity-20 px-4 py-2 rounded-lg">
-                                                                    <p className="text-xs text-purple-100 font-medium">Rata-rata Kelas</p>
+                                                                <div className="bg-white bg-opacity-20 px-4 py-2 rounded-lg" title="Rata-rata nilai per mata pelajaran pada periode ini">
+                                                                    <p className="text-xs text-purple-100 font-medium">Rata-rata Mapel</p>
                                                                     <p className="text-2xl font-bold text-white">{groupAvg}</p>
                                                                 </div>
                                                             </div>

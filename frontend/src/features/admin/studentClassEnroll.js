@@ -366,7 +366,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
       </div>
       <div className="flex-1">
         <h4 className="text-sm font-medium text-gray-900">{student.nama_siswa}</h4>
-        <p className="text-xs text-gray-500">Student ID: {student.id_siswa}</p>
+        <p className="text-xs text-gray-500">NISN Siswa: {student.id_siswa}</p>
       </div>
       {isSelected && (
         <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
@@ -379,12 +379,12 @@ const StudentClassEnroll = ({ activeTASemester }) => {
   const enrolledStudentsColumns = [
     { 
       key: 'id_siswa', 
-      label: 'Student ID',
+      label: 'NISN Siswa',
       render: (value) => <span className="font-medium">{value}</span>
     },
     { 
       key: 'nama_siswa', 
-      label: 'Student Name',
+      label: 'Nama Siswa',
       render: (value) => (
         <div className="flex items-center">
           <div className="bg-gradient-to-br from-blue-400 to-indigo-500 p-2 rounded-full mr-3">
@@ -409,25 +409,25 @@ const StudentClassEnroll = ({ activeTASemester }) => {
   // Stats data
   const statsData = [
     {
-      label: 'Total Students',
+      label: 'Total Siswa',
       value: students.length,
       icon: 'users',
       gradient: 'from-blue-400 to-indigo-500'
     },
     {
-      label: 'Available Classes',
+      label: 'Kelas Tersedia',
       value: kelas.length,
       icon: 'door-open',
       gradient: 'from-emerald-400 to-cyan-500'
     },
     {
-      label: 'In Selected Class',
+      label: 'Di Kelas Terpilih',
       value: studentsInSelectedKelas.length,
       icon: 'user-check',
       gradient: 'from-purple-400 to-pink-500'
     },
     {
-      label: 'Selected to Assign',
+      label: 'Terpilih untuk Ditugaskan',
       value: selectedStudents.length,
       icon: 'user-plus',
       gradient: 'from-orange-400 to-red-500'
@@ -438,8 +438,8 @@ const StudentClassEnroll = ({ activeTASemester }) => {
     <ModuleContainer>
       <PageHeader
         icon="users-cog"
-        title="Student Class Enrollment"
-        subtitle="Assign students to classes for the active academic term"
+        title="Penugasan Siswa ke Kelas"
+        subtitle="Menugaskan siswa ke kelas untuk tahun ajaran dan semester aktif"
         badge={activeTASemester ? `${activeTASemester.tahun_ajaran} - ${activeTASemester.semester}` : 'No Active Term'}
         action={
           <Button
@@ -501,14 +501,14 @@ const StudentClassEnroll = ({ activeTASemester }) => {
             <div className="space-y-8">
               {/* Class Selection */}
               <FormSection 
-                title="Select Target Class" 
+                title="Pilih Kelas Target" 
                 icon="door-open"
                 variant="primary"
               >
                 <div className="form-group">
                   <label>
                     <i className="fas fa-chalkboard mr-2 text-gray-500"></i>
-                    Target Class
+                    Kelas Target
                   </label>
                   <select 
                     value={selectedKelasId} 
@@ -600,10 +600,10 @@ const StudentClassEnroll = ({ activeTASemester }) => {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center">
                     <i className="fas fa-users mr-3 text-purple-500 text-2xl sm:text-3xl"></i>
-                    Students in {selectedClass?.nama_kelas || 'Selected Class'}
+                    Siswa di Kelas {selectedClass?.nama_kelas || 'Kelas Terpilih'}
                   </h3>
                   <span className="bg-purple-100 text-purple-600 px-3 py-1 rounded-full text-sm font-medium">
-                    {studentsInSelectedKelas.length} enrolled
+                    {studentsInSelectedKelas.length} ditugaskan
                   </span>
                 </div>
                 
@@ -675,9 +675,9 @@ const StudentClassEnroll = ({ activeTASemester }) => {
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4">
                   <h3 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center">
                     <i className="fas fa-user-plus mr-3 text-blue-500 text-2xl sm:text-3xl"></i>
-                    Add Students to Class
+                    Tambahkan Siswa ke Kelas
                     <span className="ml-2 bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-sm">
-                      {filteredAvailableStudents.length} available
+                      {filteredAvailableStudents.length} tersedia
                     </span>
                   </h3>
                   
@@ -864,8 +864,8 @@ const StudentClassEnroll = ({ activeTASemester }) => {
           {console.log('ConfirmDialog rendering with deleteConfirm:', deleteConfirm)}
           <ConfirmDialog
             show={deleteConfirm.show}
-            title="Remove Student from Class"
-            message={`Are you sure you want to remove "${deleteConfirm.student?.nama_siswa}" from this class? All existing grades will be kept, and the student can be re-enrolled later.`}
+            title="Keluarkan Siswa dari Kelas"
+            message={`Apakah Anda yakin ingin mengeluarkan "${deleteConfirm.student?.nama_siswa}" dari kelas ini? Semua nilai yang ada akan disimpan, dan siswa dapat didaftarkan kembali nanti.`}
             confirmText="Remove"
             cancelText="Cancel"
             onConfirm={confirmRemoveStudent}

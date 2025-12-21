@@ -100,7 +100,8 @@ exports.deleteStudent = (req, res) => {
 exports.getAllTeachers = (req, res) => {
     const db = getDb();
     // Use CASE WHEN to normalize is_admin across Postgres (boolean) and SQLite (integer)
-    db.all("SELECT id_guru, username, nama_guru, email, CASE WHEN is_admin THEN 1 ELSE 0 END AS is_admin FROM guru", [], (err, rows) => {
+    // Order by teacher name for stable listing
+    db.all("SELECT id_guru, username, nama_guru, email, CASE WHEN is_admin THEN 1 ELSE 0 END AS is_admin FROM guru ORDER BY nama_guru ASC", [], (err, rows) => {
         if (err) {
             console.error("Error fetching teachers:", err.message);
             return res.status(500).json({ message: err.message });

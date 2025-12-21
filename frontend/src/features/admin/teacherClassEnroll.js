@@ -366,25 +366,25 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
 
   const statsData = [
     {
-      label: 'Teachers',
+      label: 'Guru',
       value: teachers.length,
       icon: 'chalkboard-teacher',
       gradient: 'from-emerald-400 to-cyan-400'
     },
     {
-      label: 'Subjects',
+      label: 'Mata Pelajaran',
       value: mataPelajaran.length,
       icon: 'book',
       gradient: 'from-orange-400 to-amber-500'
     },
     {
-      label: 'Classes',
+      label: 'Kelas',
       value: kelas.length,
       icon: 'door-open',
       gradient: 'from-blue-400 to-indigo-500'
     },
     {
-      label: 'Assignments',
+      label: 'Penugasan',
       value: assignments.length,
       icon: 'tasks',
       gradient: 'from-purple-400 to-pink-500'
@@ -395,8 +395,8 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
     <ModuleContainer>
       <PageHeader
         icon="chalkboard-teacher"
-        title="Teacher Class Assignment"
-        subtitle="Assign teachers to subjects and classes"
+        title="Penugasan Guru"
+        subtitle="Menugaskan guru ke mata pelajaran dan kelas"
         badge={activeTASemester ? `${activeTASemester.tahun_ajaran} - ${activeTASemester.semester}` : 'No Active Term'}
         action={
           <Button
@@ -433,7 +433,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
         />
       )}
 
-      {loading && <LoadingSpinner message="Loading teacher assignments..." />}
+      {loading && <LoadingSpinner message="Memuat data..." />}
 
       {error && (
         <StatusMessage 
@@ -448,7 +448,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
           {!activeTASemester && (
             <StatusMessage 
               type="warning"
-              message="Please set an active Academic Year & Semester first."
+              message="Silakan atur Tahun Ajaran & Semester aktif terlebih dahulu."
               icon="exclamation-triangle"
               className="mb-6"
             />
@@ -458,7 +458,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
             <div className="space-y-8">
               {/* Assignment Form */}
               <FormSection 
-                title="Assign Teacher" 
+                title="Tugaskan Guru" 
                 icon="user-plus"
                 variant="success"
               >
@@ -467,7 +467,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
                     <div className="form-group">
                       <label>
                         <i className="fas fa-chalkboard-teacher mr-2 text-gray-500"></i>
-                        Teacher
+                        Guru
                       </label>
                       <select 
                         value={selectedGuruId} 
@@ -483,7 +483,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
                     <div className="form-group">
                       <label>
                         <i className="fas fa-book mr-2 text-gray-500"></i>
-                        Subject
+                        Mata Pelajaran
                       </label>
                       <select 
                         value={selectedMapelId} 
@@ -499,7 +499,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
                     <div className="form-group">
                       <label>
                         <i className="fas fa-door-open mr-2 text-gray-500"></i>
-                        Class
+                        Kelas
                       </label>
                       <select 
                         value={selectedKelasId} 

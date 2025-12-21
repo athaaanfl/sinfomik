@@ -174,6 +174,7 @@ const EditTeacherModal = ({ teacher, onClose, onSave }) => {
 const GuruManagement = ({ isSuperAdmin = false }) => {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
@@ -194,6 +195,11 @@ const GuruManagement = ({ isSuperAdmin = false }) => {
     fetchTeachers();
   }, []);
 
+  // Reset page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const itemsPerPage = 20;
 
   const fetchTeachers = async () => {
@@ -202,8 +208,10 @@ const GuruManagement = ({ isSuperAdmin = false }) => {
     try {
       const data = await adminApi.getTeachers();
       setTeachers(data);
+      return data; // return fetched array so callers can compute index/page
     } catch (err) {
       setError(err.message);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -253,7 +261,12 @@ const GuruManagement = ({ isSuperAdmin = false }) => {
     try {
       const response = await adminApi.setGuruAdminStatus(teacher.id_guru, !teacher.is_admin);
       showMessage(response.message);
-      fetchTeachers();
+      const data = await fetchTeachers();
+      // Find updated teacher's index and go to its page so user sees the updated row
+      const idx = data.findIndex(t => t.id_guru === teacher.id_guru);
+      if (idx !== -1) {
+        setCurrentPage(Math.floor(idx / itemsPerPage) + 1);
+      }
     } catch (err) {
       showMessage(err.message || 'Gagal mengubah status admin', 'error');
     }
@@ -366,13 +379,36 @@ const GuruManagement = ({ isSuperAdmin = false }) => {
       </FormSection>
 
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+        <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-gray-800 flex items-center">
           <i className="fas fa-list mr-2 text-indigo-600"></i>
           Daftar Guru
-          <span className="ml-auto text-sm font-normal text-gray-500">
-            Total: {teachers.length}
-          </span>
+          <span className="ml-3 text-sm text-gray-500">({teachers.length} total)</span>
         </h2>
+
+        {/* Search input */}
+        <div className="w-full max-w-sm relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i className="fas fa-search text-gray-400"></i>
+          </div>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Cari NIP atau Nama..."
+            className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border transition-colors duration-200"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+              title="Clear search"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+          )}
+        </div>
+      </div>
 
         {loading && <LoadingSpinner text="Memuat data guru..." />}
         {error && <StatusMessage type="error" message={`Error: ${error}`} autoClose={false} />}
@@ -424,7 +460,16 @@ const GuruManagement = ({ isSuperAdmin = false }) => {
                   )
                 }
               ]}
-              data={teachers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+              // Apply client-side search filter then paginate
+              data={(
+                teachers
+                  .filter(t => {
+                    const q = searchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return (t.id_guru && String(t.id_guru).toLowerCase().includes(q)) || (t.nama_guru && t.nama_guru.toLowerCase().includes(q));
+                  })
+                  .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+              )}
               emptyMessage="Belum ada guru terdaftar"
               actions={(teacher) => (
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -444,7 +489,7 @@ const GuruManagement = ({ isSuperAdmin = false }) => {
                       size="sm"
                       onClick={() => toggleAdmin(teacher)}
                     >
-                      {teacher.is_admin ? 'Revoke Admin' : 'Make Admin'}
+                      {teacher.is_admin ? 'Cabut Admin' : 'Jadikan Admin'}
                     </Button>
                   )}
 
@@ -461,11 +506,27 @@ const GuruManagement = ({ isSuperAdmin = false }) => {
             />
 
             {/* Pagination */}
-            {teachers.length > itemsPerPage && (
+            { (teachers.filter(t => {
+                  const q = searchTerm.trim().toLowerCase();
+                  if (!q) return true;
+                  return (t.id_guru && String(t.id_guru).toLowerCase().includes(q)) || (t.nama_guru && t.nama_guru.toLowerCase().includes(q));
+                })).length > itemsPerPage && (
               <div className="bg-white rounded-lg shadow p-4 flex items-center justify-between">
                 <div className="text-sm text-gray-600">
-                  Halaman {currentPage} dari {Math.ceil(teachers.length / itemsPerPage)} 
-                  ({(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, teachers.length)} dari {teachers.length})
+                  Halaman {currentPage} dari {Math.ceil((teachers.filter(t => {
+                    const q = searchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return (t.id_guru && String(t.id_guru).toLowerCase().includes(q)) || (t.nama_guru && t.nama_guru.toLowerCase().includes(q));
+                  })).length / itemsPerPage)} 
+                  ({(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, (teachers.filter(t => {
+                    const q = searchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return (t.id_guru && String(t.id_guru).toLowerCase().includes(q)) || (t.nama_guru && t.nama_guru.toLowerCase().includes(q));
+                  })).length)} dari {(teachers.filter(t => {
+                    const q = searchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return (t.id_guru && String(t.id_guru).toLowerCase().includes(q)) || (t.nama_guru && t.nama_guru.toLowerCase().includes(q));
+                  })).length})
                 </div>
                 <div className="flex gap-2">
                   <Button

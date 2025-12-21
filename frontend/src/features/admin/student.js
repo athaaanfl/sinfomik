@@ -156,6 +156,7 @@ const StudentManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
   const [activeTASemester, setActiveTASemester] = useState(null);
   const [newStudent, setNewStudent] = useState({
     id_siswa: '',
@@ -207,6 +208,11 @@ const StudentManagement = () => {
     fetchStudents();
     fetchActiveTASemester();
   }, []);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const showMessage = (text, type = 'success') => {
     setMessage(text);
@@ -442,11 +448,37 @@ const StudentManagement = () => {
       </FormSection>
 
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-          <i className="fas fa-list mr-2 text-indigo-600"></i>
-          Daftar Siswa
-        </h2>
-        
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center">
+            <i className="fas fa-list mr-2 text-indigo-600"></i>
+            Daftar Siswa
+            <span className="ml-3 text-sm text-gray-500">({students.length} total)</span>
+          </h2>
+
+          {/* Search input */}
+          <div className="w-full max-w-sm relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i className="fas fa-search text-gray-400"></i>
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Cari NISN atau Nama..."
+              className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border transition-colors duration-200"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                title="Clear search"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            )}
+          </div>
+        </div>
+
         {loading && <LoadingSpinner text="Memuat data siswa..." />}
         
         {error && (
@@ -496,7 +528,16 @@ const StudentManagement = () => {
                     )
                   }
                 ]}
-                data={students.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)}
+                // Apply client-side search filter then paginate
+            data={(
+              students
+                .filter(s => {
+                  const q = searchTerm.trim().toLowerCase();
+                  if (!q) return true;
+                  return (s.id_siswa && String(s.id_siswa).toLowerCase().includes(q)) || (s.nama_siswa && s.nama_siswa.toLowerCase().includes(q));
+                })
+                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+            )}
                 emptyMessage="Belum ada siswa terdaftar"
                 actions={(student) => (
                   <div className="flex flex-col sm:flex-row gap-2">
@@ -521,11 +562,27 @@ const StudentManagement = () => {
             />
 
             {/* Pagination */}
-            {students.length > itemsPerPage && (
+            { (students.filter(s => {
+                  const q = searchTerm.trim().toLowerCase();
+                  if (!q) return true;
+                  return (s.id_siswa && String(s.id_siswa).toLowerCase().includes(q)) || (s.nama_siswa && s.nama_siswa.toLowerCase().includes(q));
+                })).length > itemsPerPage && (
               <div className="bg-white rounded-lg shadow p-4 flex items-center justify-between">
                 <div className="text-sm text-gray-600">
-                  Halaman {currentPage} dari {Math.ceil(students.length / itemsPerPage)} 
-                  ({(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, students.length)} dari {students.length})
+                  Halaman {currentPage} dari {Math.ceil((students.filter(s => {
+                    const q = searchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return (s.id_siswa && String(s.id_siswa).toLowerCase().includes(q)) || (s.nama_siswa && s.nama_siswa.toLowerCase().includes(q));
+                  })).length / itemsPerPage)} 
+                  ({(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, (students.filter(s => {
+                    const q = searchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return (s.id_siswa && String(s.id_siswa).toLowerCase().includes(q)) || (s.nama_siswa && s.nama_siswa.toLowerCase().includes(q));
+                  })).length)} dari {(students.filter(s => {
+                    const q = searchTerm.trim().toLowerCase();
+                    if (!q) return true;
+                    return (s.id_siswa && String(s.id_siswa).toLowerCase().includes(q)) || (s.nama_siswa && s.nama_siswa.toLowerCase().includes(q));
+                  })).length})
                 </div>
                 <div className="flex gap-2">
                   <Button

@@ -440,7 +440,7 @@ const EditCapaianPembelajaranModal = ({ cp, onClose, onSave }) => {
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <i className="fas fa-edit text-emerald-600"></i>
-            Edit Learning Achievement
+            Edit Capaian Pembelajaran
           </h3>
           <button 
             onClick={onClose}
@@ -488,7 +488,7 @@ const EditCapaianPembelajaranModal = ({ cp, onClose, onSave }) => {
           <div className="form-group">
             <label>
               <i className="fas fa-align-left mr-2 text-gray-500"></i>
-              Learning Achievement Description
+              Deskripsi Capaian Pembelajaran
             </label>
             <textarea
               name="deskripsi_cp"
@@ -496,7 +496,7 @@ const EditCapaianPembelajaranModal = ({ cp, onClose, onSave }) => {
               onChange={(e) => setEditedCp(prev => ({ ...prev, deskripsi_cp: e.target.value }))}
               required
               rows="6"
-              placeholder="Enter learning achievement description..."
+              placeholder="Masukkan deskripsi capaian pembelajaran..."
             />
           </div>
 
@@ -594,7 +594,7 @@ const ImportExcel = ({ onImportSuccess }) => {
 
   return (
     <FormSection 
-      title="Import from Excel" 
+      title="Import dari Excel" 
       icon="file-excel"
       variant="warning"
     >
@@ -686,7 +686,7 @@ const CapaianPembelajaranManagement = () => {
     e.preventDefault();
     
     if (!newCp.deskripsi_cp.trim()) {
-      showMessage('Learning achievement description must be filled', 'error');
+      showMessage('Deskripsi capaian pembelajaran harus diisi', 'error');
       return;
     }
 
@@ -762,25 +762,25 @@ const CapaianPembelajaranManagement = () => {
   // Stats
   const statsData = [
     {
-      label: 'Total Achievements',
+      label: 'Total Capaian Pembelajaran',
       value: cps.length,
       icon: 'list-check',
       gradient: 'from-emerald-400 to-cyan-400'
     },
     {
-      label: 'Phase A',
+      label: 'Fase A',
       value: cps.filter(cp => cp.fase === 'A').length,
       icon: 'star',
       gradient: 'from-blue-400 to-indigo-400'
     },
     {
-      label: 'Phase B',
+      label: 'Fase B',
       value: cps.filter(cp => cp.fase === 'B').length,
       icon: 'certificate',
       gradient: 'from-orange-400 to-red-400'
     },
     {
-      label: 'Phase C',
+      label: 'Fase C',
       value: cps.filter(cp => cp.fase === 'C').length,
       icon: 'trophy',
       gradient: 'from-purple-400 to-pink-400'
@@ -791,8 +791,8 @@ const CapaianPembelajaranManagement = () => {
     <ModuleContainer>
       <PageHeader
         icon="clipboard-check"
-        title="Learning Achievement Management"
-        subtitle="Manage curriculum learning achievements by phase"
+        title="Manajemen Capaian Pembelajaran"
+        subtitle="Kelola capaian pembelajaran kurikulum berdasarkan fase"
         badge={`${cps.length} Total`}
         action={
           <Button
@@ -829,7 +829,7 @@ const CapaianPembelajaranManagement = () => {
         />
       )}
 
-      {loading && <LoadingSpinner message="Loading learning achievements..." />}
+      {loading && <LoadingSpinner message="Memuat data capaian pembelajaran..." />}
 
       {error && (
         <StatusMessage 
@@ -846,7 +846,7 @@ const CapaianPembelajaranManagement = () => {
 
           {/* Add CP Form */}
           <FormSection 
-            title="Add New Learning Achievement" 
+            title="Tambah Capaian Pembelajaran Baru" 
             icon="plus-circle"
             variant="success"
           >
@@ -855,7 +855,7 @@ const CapaianPembelajaranManagement = () => {
                 <div className="form-group">
                   <label>
                     <i className="fas fa-book mr-2 text-gray-500"></i>
-                    Subject
+                    Mata Pelajaran
                   </label>
                   <select
                     name="id_mapel"
@@ -873,7 +873,7 @@ const CapaianPembelajaranManagement = () => {
                 <div className="form-group">
                   <label>
                     <i className="fas fa-layer-group mr-2 text-gray-500"></i>
-                    Phase
+                    Fase
                   </label>
                   <select
                     name="fase"
@@ -881,9 +881,9 @@ const CapaianPembelajaranManagement = () => {
                     onChange={(e) => setNewCp({ ...newCp, fase: e.target.value })}
                     required
                   >
-                    <option value="A">Phase A</option>
-                    <option value="B">Phase B</option>
-                    <option value="C">Phase C</option>
+                    <option value="A">Fase A</option>
+                    <option value="B">Fase B</option>
+                    <option value="C">Fase C</option>
                   </select>
                 </div>
               </div>
@@ -891,7 +891,7 @@ const CapaianPembelajaranManagement = () => {
               <div className="form-group">
                 <label>
                   <i className="fas fa-align-left mr-2 text-gray-500"></i>
-                  Learning Achievement Description
+                  Deskripsi Capaian Pembelajaran
                 </label>
                 <textarea
                   name="deskripsi_cp"
@@ -899,7 +899,7 @@ const CapaianPembelajaranManagement = () => {
                   onChange={(e) => setNewCp({ ...newCp, deskripsi_cp: e.target.value })}
                   required
                   rows="4"
-                  placeholder="Enter learning achievement description..."
+                  placeholder="Masukkan deskripsi capaian pembelajaran..."
                 />
               </div>
 
@@ -909,7 +909,7 @@ const CapaianPembelajaranManagement = () => {
                 icon="plus"
                 className="w-full"
               >
-                Add Learning Achievement
+                Tambah Capaian Pembelajaran
               </Button>
             </form>
           </FormSection>
@@ -919,7 +919,7 @@ const CapaianPembelajaranManagement = () => {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center">
                 <i className="fas fa-list-alt mr-3 text-emerald-500 text-2xl sm:text-3xl"></i>
-                Learning Achievements Directory
+                Direktori Capaian Pembelajaran
               </h2>
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1 sm:flex-none">
@@ -927,7 +927,7 @@ const CapaianPembelajaranManagement = () => {
                     type="text" 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search achievements..." 
+                    placeholder="Cari capaian pembelajaran..." 
                     className="w-full sm:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                   <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
@@ -948,11 +948,11 @@ const CapaianPembelajaranManagement = () => {
             {filteredCps.length === 0 && (
               <EmptyState
                 icon="clipboard-check"
-                title="No Learning Achievements Found"
+                title="Tidak Ada Capaian Pembelajaran Ditemukan"
                 message={
                   searchTerm || selectedSubject !== 'all' ? 
-                    'No achievements match your search criteria.' : 
-                    "You haven't registered any learning achievements yet. Click the 'Add Learning Achievement' button above to get started."
+                    'Tidak ada capaian yang sesuai dengan kriteria pencarian Anda.' : 
+                    "Anda belum mendaftarkan capaian pembelajaran apapun. Klik tombol 'Tambah Capaian Pembelajaran' di atas untuk memulai."
                 }
               />
             )}
@@ -973,7 +973,7 @@ const CapaianPembelajaranManagement = () => {
                               {mapel.nama_mapel}
                             </h3>
                             <span className="bg-white/20 text-white px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
-                              {cpMapel.length} Achievement{cpMapel.length !== 1 ? 's' : ''}
+                              {cpMapel.length} Capaian{cpMapel.length !== 1 ? '' : ''}
                             </span>
                           </div>
                         </div>
@@ -992,7 +992,7 @@ const CapaianPembelajaranManagement = () => {
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
                                       <h4 className="font-bold text-gray-800">
                                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-medium bg-gradient-to-r ${getPhaseBadgeColor(fase)} text-white`}>
-                                          Phase {fase}
+                                          Fase {fase}
                                         </span>
                                       </h4>
                                       {cpFase && (
@@ -1027,7 +1027,7 @@ const CapaianPembelajaranManagement = () => {
                                     {cpFase ? (
                                       <p className="text-gray-600 text-sm leading-relaxed break-words">{cpFase.deskripsi_cp}</p>
                                     ) : (
-                                      <p className="text-gray-400 italic text-sm">No learning achievement defined for this phase yet.</p>
+                                      <p className="text-gray-400 italic text-sm">Tidak ada TP untuk fase ini.</p>
                                     )}
                                   </div>
                                 </div>
@@ -1066,10 +1066,10 @@ const CapaianPembelajaranManagement = () => {
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={deleteConfirm.show}
-        title="Delete Learning Achievement"
-        message={`Are you sure you want to delete this learning achievement: "${deleteConfirm.cp?.deskripsi_cp?.substring(0, 50)}..."? This action cannot be undone.`}
-        confirmText="Delete"
-        cancelText="Cancel"
+        title="Hapus Capaian Pembelajaran"
+        message={`Apakah Anda yakin ingin menghapus capaian pembelajaran: "${deleteConfirm.cp?.deskripsi_cp?.substring(0, 50)}..."? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Hapus"
+        cancelText="Batal"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirm({ show: false, cp: null })}
         variant="danger"
