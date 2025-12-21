@@ -83,9 +83,14 @@ exports.getSchoolAnalytics = async (req, res) => {
  */
 exports.getAngkatanAnalytics = async (req, res) => {
     try {
-        const { tahun_ajaran_masuk } = req.params;
+        // Accept tahun_ajaran_masuk either as a path param or as a query param
+        const tahun_ajaran_masuk = req.params.tahun_ajaran_masuk || req.query.tahun_ajaran_masuk;
         const { id_mapel } = req.query;
         const db = getDb();
+
+        if (!tahun_ajaran_masuk) {
+            return res.status(400).json({ message: 'Parameter tahun_ajaran_masuk diperlukan' });
+        }
 
         let query = `
             SELECT 

@@ -55,10 +55,10 @@ export const fetchSchoolAnalytics = async (params = {}) => {
  * @returns {Promise<Object>} Angkatan analytics data
  */
 export const fetchAngkatanAnalytics = async (tahunAjaranMasuk, params = {}) => {
-    // URL encode the tahun ajaran to handle the slash character
-    const encodedTahunAjaran = encodeURIComponent(tahunAjaranMasuk);
-    const queryString = new URLSearchParams(params).toString();
-    const url = `${API_BASE_URL}/api/analytics/angkatan/${encodedTahunAjaran}${queryString ? `?${queryString}` : ''}`;
+    // Put tahun_ajaran_masuk in query string to avoid encoded-slash routing issues
+    const allParams = { ...params, tahun_ajaran_masuk: tahunAjaranMasuk };
+    const queryString = new URLSearchParams(allParams).toString();
+    const url = `${API_BASE_URL}/api/analytics/angkatan?${queryString}`;
     return fetchWithAuth(url);
 };
 

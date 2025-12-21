@@ -19,7 +19,9 @@ router.use(isAdminOrGuru);
 router.get('/school', analyticsController.getSchoolAnalytics);
 
 // Angkatan analytics (ADMIN & GURU)
-// GET /api/analytics/angkatan/:tahun_ajaran_masuk?id_mapel=1
+// GET /api/analytics/angkatan (accepts query param tahun_ajaran_masuk)
+router.get('/angkatan', analyticsController.getAngkatanAnalytics);
+// Backwards-compatible route: GET /api/analytics/angkatan/:tahun_ajaran_masuk
 router.get('/angkatan/:tahun_ajaran_masuk', analyticsController.getAngkatanAnalytics);
 
 // Get list of available angkatan
