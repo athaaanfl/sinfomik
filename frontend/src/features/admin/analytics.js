@@ -3,7 +3,8 @@ import {
     fetchSchoolAnalytics, 
     fetchAngkatanAnalytics, 
     fetchAngkatanList,
-    fetchStudentAnalytics 
+    fetchStudentAnalytics,
+    fetchStudentMapelDetails
 } from '../../api/analytics';
 import { 
     LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -49,6 +50,43 @@ const AdminAnalytics = () => {
     const [studentData, setStudentData] = useState(null);
     const [studentId, setStudentId] = useState('');
     const [selectedMapelStudent, setSelectedMapelStudent] = useState('all');
+
+    // Mapel detail modal state
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [detailModalLoading, setDetailModalLoading] = useState(false);
+    const [detailModalData, setDetailModalData] = useState([]);
+    const [detailModalMapelName, setDetailModalMapelName] = useState('');
+
+    const handleShowMapelDetails = async (item) => {
+        if (!studentId) {
+            setError('Pilih siswa terlebih dahulu');
+            return;
+        }
+        setDetailModalLoading(true);
+        setDetailModalOpen(true);
+        setDetailModalData([]);
+        setDetailModalMapelName(item.nama_mapel || 'Mapel');
+        try {
+            const params = {};
+            if (item.id_ta_semester) params.id_ta_semester = item.id_ta_semester;
+            const res = await fetchStudentMapelDetails(studentId, item.id_mapel, params);
+            // res may include { data: [...] } or be the array — handle both
+            const rows = res && res.data ? res.data : (Array.isArray(res) ? res : []);
+            setDetailModalData(rows);
+        } catch (err) {
+            console.error('Error fetching mapel details:', err);
+            setError('Gagal memuat detail mapel siswa');
+            setDetailModalData([]);
+        } finally {
+            setDetailModalLoading(false);
+        }
+    };
+
+    const handleCloseDetailModal = () => {
+        setDetailModalOpen(false);
+        setDetailModalData([]);
+        setDetailModalMapelName('');
+    };
 
     // Fetch mata pelajaran list from school data
     useEffect(() => {
@@ -1208,6 +1246,7 @@ const AdminAnalytics = () => {
                                                                         <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 border-b">Rata TP</th>
                                                                         <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 border-b">UAS</th>
                                                                         <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 border-b">Nilai Akhir</th>
+                                                                        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 border-b">Aksi</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody className="divide-y divide-gray-200">
@@ -1217,6 +1256,14 @@ const AdminAnalytics = () => {
                                                                             <td className="px-6 py-4 text-center text-sm text-gray-700">{item.rata_tp || '-'}</td>
                                                                             <td className="px-6 py-4 text-center text-sm text-gray-700">{item.nilai_uas || '-'}</td>
                                                                             <td className="px-6 py-4 text-center text-sm font-bold text-purple-600">{item.rata_keseluruhan || '-'}</td>
+                                                                            <td className="px-6 py-4 text-center text-sm">
+                                                                                <button
+                                                                                    onClick={() => handleShowMapelDetails(item)}
+                                                                                    className="btn-ghost px-3 py-1 border rounded"
+                                                                                >
+                                                                                    Lihat Detail
+                                                                                </button>
+                                                                            </td>
                                                                         </tr>
                                                                     ))}
                                                                 </tbody>
@@ -1237,6 +1284,76 @@ const AdminAnalytics = () => {
                             )}
                         </>
                     )}
+                </div>
+            )}
+            {/* Detail Modal */}
+            {detailModalOpen && (
+                <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+                    <div className="modal-content animate-slideInUp w-full max-w-full sm:max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto max-h-[90vh] overflow-auto bg-white rounded-lg shadow-lg">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 border-b">
+                            <h3 className="text-lg sm:text-xl font-bold">Detail Nilai: {detailModalMapelName}</h3>
+                            <div className="ml-auto flex items-center gap-2">
+                                <button onClick={handleCloseDetailModal} className="text-gray-500 hover:text-gray-800 p-2 rounded-md">
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        {detailModalLoading ? (
+                            <div className="p-6"><LoadingSpinner text="Memuat detail..." /></div>
+                        ) : (
+                            <div className="p-4">
+                                {detailModalData && detailModalData.length > 0 ? (
+                                    <div className="overflow-auto bg-white rounded-lg border p-2">
+                                        <div className="min-w-[680px]">
+                                            <table className="w-full table-auto">
+                                                <thead className="bg-gray-50">
+                                                    <tr>
+                                                        <th className="px-3 py-2 text-left text-xs">Periode</th>
+                                                        <th className="px-3 py-2 text-left text-xs">Kelas</th>
+                                                        <th className="px-3 py-2 text-center text-xs">Jenis</th>
+                                                        <th className="px-3 py-2 text-center text-xs">TP</th>
+                                                        <th className="px-3 py-2 text-left text-xs">Nama TP</th>
+                                                        <th className="px-3 py-2 text-center text-xs">Nilai</th>
+                                                        <th className="px-3 py-2 text-center text-xs">Tanggal</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {(() => {
+                                                        const nums = detailModalData.map(d => (typeof d.nilai === 'number' ? d.nilai : parseFloat(d.nilai))).filter(n => !isNaN(n));
+                                                        const min = nums.length ? Math.min(...nums) : null;
+                                                        const max = nums.length ? Math.max(...nums) : null;
+                                                        return detailModalData.map((d, idx) => {
+                                                            const nVal = typeof d.nilai === 'number' ? d.nilai : parseFloat(d.nilai);
+                                                            const highlightLow = min !== null && nVal === min;
+                                                            const highlightHigh = max !== null && nVal === max;
+                                                            return (
+                                                                <tr key={idx} className={`hover:bg-gray-50 ${highlightLow ? 'bg-red-50' : ''} ${highlightHigh ? 'bg-green-50' : ''}`}>
+                                                                    <td className="px-3 py-2 text-sm">{d.tahun_ajaran || '-'} {d.semester || ''}</td>
+                                                                    <td className="px-3 py-2 text-sm">{d.nama_kelas || '-'}</td>
+                                                                    <td className="px-3 py-2 text-center text-sm">{d.jenis_nilai || '-'}</td>
+                                                                    <td className="px-3 py-2 text-center text-sm">{d.urutan_tp ? `TP${d.urutan_tp}` : '-'}</td>
+                                                                    <td className="px-3 py-2 text-sm">{d.tp_name || '-'}</td>
+                                                                    <td className="px-3 py-2 text-center text-sm font-semibold">{d.nilai !== null && d.nilai !== undefined ? d.nilai : '-'}</td>
+                                                                    <td className="px-3 py-2 text-center text-sm">{d.tanggal_input ? new Date(d.tanggal_input).toLocaleDateString() : '-'}</td>
+                                                                </tr>
+                                                            );
+                                                        });
+                                                    })()}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <EmptyState icon="clipboard-list" title="Tidak Ada Data" description="Tidak ditemukan nilai untuk mapel ini." />
+                                )}
+                            </div>
+                        )}
+
+                        <div className="p-4 border-t flex justify-end">
+                            <button onClick={handleCloseDetailModal} className="btn-ghost px-4 py-2">Tutup</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </ModuleContainer>

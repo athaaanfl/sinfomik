@@ -168,14 +168,62 @@ const InputNilai = ({ activeTASemester, userId }) => {
           activeTASemester.id_ta_semester
         );
         
-        if (manualTpData.success && manualTpData.manual_tp.length > 0) {
+        // 🆕 AUTO-SAVE: Simpan TP dari Excel ke database jika belum ada
+        if (tpData.success && tpData.tp_list && tpData.tp_list.length > 0) {
+          const existingTpNumbers = manualTpData.success && manualTpData.manual_tp 
+            ? manualTpData.manual_tp.map(tp => tp.tp_number) 
+            : [];
+          
+          // Simpan TP dari Excel yang belum ada di database
+          for (let i = 0; i < tpData.tp_list.length; i++) {
+            const tp = tpData.tp_list[i];
+            const tpNumber = i + 1;
+            
+            // Cek apakah TP ini sudah ada di database untuk TA/semester ini
+            if (!existingTpNumbers.includes(tpNumber)) {
+              try {
+                await guruApi.addManualTp(
+                  penugasanData.id_penugasan,
+                  activeTASemester.id_ta_semester,
+                  tpNumber,
+                  tp.tujuan_pembelajaran
+                );
+                console.log(`✅ Auto-saved TP${tpNumber} dari Excel ke database`);
+              } catch (err) {
+                // Skip jika error (mungkin sudah ada), tidak perlu alert
+                console.log(`⚠️ TP${tpNumber} sudah ada di database, skip save`);
+              }
+            }
+          }
+          
+          // Re-fetch manual TP setelah auto-save
+          const updatedManualTpData = await guruApi.getManualTp(
+            penugasanData.id_penugasan,
+            activeTASemester.id_ta_semester
+          );
+          
+          if (updatedManualTpData.success && updatedManualTpData.manual_tp.length > 0) {
+            const manualTpColumns = updatedManualTpData.manual_tp.map(tp => tp.tp_number);
+            setManualTpList(updatedManualTpData.manual_tp);
+            
+            // Gabungkan dengan TP dari ATP, hilangkan duplikat
+            tpNumbers = [...new Set([...tpNumbers, ...manualTpColumns])].sort((a, b) => a - b);
+            
+            // Prioritaskan deskripsi dari database (karena sudah tersimpan)
+            updatedManualTpData.manual_tp.forEach(tp => {
+              descriptions[tp.tp_number] = tp.tp_name;
+              if (!newKkm[`TP${tp.tp_number}`]) {
+                newKkm[`TP${tp.tp_number}`] = 75;
+              }
+            });
+          }
+        } else if (manualTpData.success && manualTpData.manual_tp.length > 0) {
+          // Tidak ada TP dari Excel, gunakan TP manual saja
           const manualTpColumns = manualTpData.manual_tp.map(tp => tp.tp_number);
           setManualTpList(manualTpData.manual_tp);
           
-          // Gabungkan dengan TP dari ATP, hilangkan duplikat
           tpNumbers = [...new Set([...tpNumbers, ...manualTpColumns])].sort((a, b) => a - b);
           
-          // Set nama dan KKM untuk TP manual
           manualTpData.manual_tp.forEach(tp => {
             descriptions[tp.tp_number] = tp.tp_name;
             if (!newKkm[`TP${tp.tp_number}`]) {
@@ -195,7 +243,7 @@ const InputNilai = ({ activeTASemester, userId }) => {
         const semesterText = tpData.semester_text || 'Semua';
         const manualCount = tpNumbers.length - tpData.tp_list.length;
         const manualText = manualCount > 0 ? ` (+${manualCount} TP manual)` : '';
-        setMessage(`✅ Berhasil memuat ${tpData.total_tp} TP dari ATP ${tpData.mapel} Fase ${fase} - Semester ${semesterText} untuk ${tpData.nama_kelas}${manualText}`);
+        setMessage(`✅ Berhasil memuat ${tpData.total_tp} TP dari ATP ${tpData.mapel} Fase ${fase} - Semester ${semesterText} untuk ${tpData.nama_kelas}${manualText}. Deskripsi tersimpan ke database.`);
         setMessageType('success');
         
         setTimeout(() => {
@@ -203,7 +251,7 @@ const InputNilai = ({ activeTASemester, userId }) => {
           setMessageType('');
         }, 5000);
       } else if (tpNumbers.length > 0) {
-        setMessage(`✅ Berhasil memuat ${tpNumbers.length} TP manual`);
+        setMessage(`✅ Berhasil memuat ${tpNumbers.length} TP dari database`);
         setMessageType('success');
         setTimeout(() => {
           setMessage('');

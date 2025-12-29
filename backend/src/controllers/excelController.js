@@ -586,14 +586,14 @@ exports.exportStudentTemplate = async (req, res) => {
         // Create workbook
         const wb = xlsx.utils.book_new();
         
-        // Header columns
-        const headers = ['NISN', 'Nama Siswa', 'Tanggal Lahir', 'Jenis Kelamin'];
+        // Header columns (added 'Tahun Ajaran' which accepts single-year like 2024 or full '2024/2025')
+        const headers = ['NISN', 'Nama Siswa', 'Tanggal Lahir', 'Jenis Kelamin', 'Tahun Ajaran Masuk'];
         
-        // Sample data for guidance
+        // Sample data for guidance (last column is Tahun Ajaran - can be '2024' or '2024/2025')
         const sampleData = [
-            ['1234567890', 'Budi Santoso', '2010-05-15', 'L'],
-            ['1234567891', 'Siti Nurhaliza', '2010-08-20', 'P'],
-            ['1234567892', 'Ahmad Rizki', '2010-03-12', 'L']
+            ['1234567890', 'Budi Santoso', '2010-05-15', 'L', '2024'],
+            ['1234567891', 'Siti Nurhaliza', '2010-08-20', 'P', '2024'],
+            ['1234567892', 'Ahmad Rizki', '2010-03-12', 'L', '2024']
         ];
         
         // Instructions
@@ -605,13 +605,14 @@ exports.exportStudentTemplate = async (req, res) => {
             ['2. Nama Siswa: Nama lengkap siswa'],
             ['3. Tanggal Lahir: Format YYYY-MM-DD (contoh: 2010-05-15) atau kosongkan'],
             ['4. Jenis Kelamin: L (Laki-laki) atau P (Perempuan)'],
+            ['5. Tahun Ajaran / Angkatan: Tahun tunggal (contoh: 2024) — opsional. Jika kosong, sistem akan mengisi dengan tahun TA aktif.'],
             [''],
             ['CONTOH DATA:'],
             headers,
             ...sampleData,
             [''],
             ['Hapus baris contoh ini dan isi dengan data siswa Anda mulai dari baris ke-11'],
-            ['Pastikan kolom NISN dan Nama Siswa tidak kosong']
+            ['Pastikan kolom NISN dan Nama Siswa tidak kosong. Tahun Ajaran dapat berupa tahun tunggal (4 digit) atau rentang (YYYY/YYYY) jika diisi.']
         ];
         
         // Create worksheet
@@ -622,7 +623,8 @@ exports.exportStudentTemplate = async (req, res) => {
             { wch: 15 }, // NISN
             { wch: 30 }, // Nama Siswa
             { wch: 15 }, // Tanggal Lahir
-            { wch: 15 }  // Jenis Kelamin
+            { wch: 15 }, // Jenis Kelamin
+            { wch: 12 }  // Tahun Masuk
         ];
         
         // Add worksheet to workbook
@@ -745,8 +747,27 @@ exports.importStudents = async (req, res) => {
             
             // Validate jenis kelamin
             const validJK = jenisKelamin === 'L' || jenisKelamin === 'P' ? jenisKelamin : 'L';
-            const tahunAjaranMasuk = activeTASemesterTahun; // Use active TA semester
-            
+            // Determine tahun_ajaran_masuk: prefer explicit column (if present), otherwise use active TA year
+            // Look for header column names like 'TAHUN AJARAN MASUK', 'TAHUN AJARAN', 'ANGKATAN', or 'TAHUN'
+            let tahunAjaranMasuk = null;
+            const tahunHeaderCandidates = ['TAHUN AJARAN MASUK', 'TAHUN AJARAN', 'ANGKATAN', 'TAHUN'];
+            for (let i = 0; i < headers.length; i++) {
+                const h = headers[i];
+                if (h && tahunHeaderCandidates.includes(h)) {
+                    if (row[i]) {
+                        const m = row[i].toString().match(/(\d{4})/);
+                        if (m) tahunAjaranMasuk = m[1];
+                    }
+                    break;
+                }
+            }
+
+            if (!tahunAjaranMasuk) {
+                // Fallback: derive first year from active TA semester (e.g., '2024/2025' -> '2024')
+                const m = (activeTASemesterTahun || '').toString().match(/(\d{4})/);
+                tahunAjaranMasuk = m ? m[1] : activeTASemesterTahun;
+            }
+
             try {
                 await new Promise((resolve, reject) => {
                     // Check if student already exists

@@ -463,23 +463,38 @@ exports.addManualTp = (req, res) => {
         });
     }
     
-    db.run(`
-        INSERT INTO manual_tp (id_penugasan, id_ta_semester, tp_number, tp_name)
-        VALUES (?, ?, ?, ?)
-    `, [id_penugasan, id_ta_semester, tp_number, tp_name], function(err) {
+    // Cek apakah TP sudah ada (untuk auto-save dari Excel)
+    db.get(`
+        SELECT id_manual_tp, tp_name FROM manual_tp 
+        WHERE id_penugasan = ? AND id_ta_semester = ? AND tp_number = ?
+    `, [id_penugasan, id_ta_semester, tp_number], (err, row) => {
         if (err) {
-            if (err.message.includes('UNIQUE constraint')) {
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'TP dengan nomor tersebut sudah ada' 
-                });
-            }
             return res.status(500).json({ success: false, message: err.message });
         }
-        res.status(201).json({ 
-            success: true, 
-            message: 'TP manual berhasil ditambahkan',
-            id_manual_tp: this.lastID 
+        
+        if (row) {
+            // TP sudah ada, return success tanpa update (proteksi data lama)
+            return res.status(200).json({ 
+                success: true, 
+                message: 'TP sudah ada di database',
+                id_manual_tp: row.id_manual_tp,
+                existing: true
+            });
+        }
+        
+        // TP belum ada, insert baru
+        db.run(`
+            INSERT INTO manual_tp (id_penugasan, id_ta_semester, tp_number, tp_name)
+            VALUES (?, ?, ?, ?)
+        `, [id_penugasan, id_ta_semester, tp_number, tp_name], function(err) {
+            if (err) {
+                return res.status(500).json({ success: false, message: err.message });
+            }
+            res.status(201).json({ 
+                success: true, 
+                message: 'TP manual berhasil ditambahkan',
+                id_manual_tp: this.lastID 
+            });
         });
     });
 };

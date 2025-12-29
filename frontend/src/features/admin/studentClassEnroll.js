@@ -76,15 +76,21 @@ const StudentClassEnroll = ({ activeTASemester }) => {
       return;
     }
     try {
-      // Fetch all students enrolled in ANY class for this semester
+      // Fetch all students enrolled in ANY class for this semester (parallelized)
       const allKelasIds = kelas.map(k => k.id_kelas);
+      const promises = allKelasIds.map(kelasId => adminApi.getSiswaInKelas(kelasId, taSemesterId));
+      const results = await Promise.all(promises);
       const allEnrolledIds = new Set();
-      
-      for (const kelasId of allKelasIds) {
-        const studentsInKelas = await adminApi.getSiswaInKelas(kelasId, taSemesterId);
-        studentsInKelas.forEach(s => allEnrolledIds.add(s.id_siswa));
-      }
-      
+
+      results.forEach(studentsInKelas => {
+        if (Array.isArray(studentsInKelas)) {
+          studentsInKelas.forEach(s => {
+            const idNum = Number(s?.id_siswa);
+            if (!Number.isNaN(idNum)) allEnrolledIds.add(idNum);
+          });
+        }
+      });
+
       console.log('All enrolled students in semester:', Array.from(allEnrolledIds));
       setAllStudentsInSemester(Array.from(allEnrolledIds));
     } catch (err) {
@@ -139,9 +145,10 @@ const StudentClassEnroll = ({ activeTASemester }) => {
     });
   };
 
-  const availableStudents = students.filter(s =>
-    !allStudentsInSemester.includes(s.id_siswa)
-  );
+  const availableStudents = students.filter(s => {
+    const idNum = Number(s.id_siswa);
+    return !allStudentsInSemester.includes(idNum);
+  });
 
   const filteredAvailableStudents = availableStudents.filter(student => {
     const q = (searchTerm || '').trim().toLowerCase();
@@ -155,7 +162,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
     if (selectedStudents.length === filteredAvailableStudents.length) {
       setSelectedStudents([]);
     } else {
-      setSelectedStudents(filteredAvailableStudents.map(s => s.id_siswa));
+      setSelectedStudents(filteredAvailableStudents.map(s => Number(s.id_siswa)));
     }
   };
 

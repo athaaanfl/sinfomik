@@ -32,6 +32,9 @@ router.get('/angkatan-list', analyticsController.getAngkatanList);
 // GET /api/analytics/student/:id_siswa?id_mapel=1
 router.get('/student/:id_siswa', analyticsController.getStudentAnalytics);
 
+// Student mapel detail (per-TP) - GET /api/analytics/student/:id_siswa/mapel/:id_mapel/details
+router.get('/student/:id_siswa/mapel/:id_mapel/details', analyticsController.getStudentMapelDetails);
+
 // Guru subject analytics (GURU - own data)
 // GET /api/analytics/guru/:id_guru?id_mapel=1&id_kelas=2&id_ta_semester=3
 router.get('/guru/:id_guru', analyticsController.getGuruAnalytics);

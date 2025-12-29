@@ -398,6 +398,12 @@ D. ANALYTICS & REPORTING
       - Semester progression
 
 E. FITUR EXCEL INTEGRATION
+
+Important note (Student import template):
+- The student import template now supports an optional column "Tahun Masuk" (or "Angkatan").
+- Provide a single year value (4 digits) such as `2024` when present. If the column is left empty, the system will use the currently active academic year (TA) and derive the start year automatically.
+- This change helps analytics group students by single-year cohorts (angkatan) instead of full ranges like `2024/2025`.
+
    - Import siswa dari file Excel
    - Export nilai ke Excel
    - Import nilai dari template Excel

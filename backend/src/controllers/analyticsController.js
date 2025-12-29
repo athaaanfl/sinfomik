@@ -94,7 +94,7 @@ exports.getAngkatanAnalytics = async (req, res) => {
 
         let query = `
             SELECT 
-                s.tahun_ajaran_masuk as angkatan,
+                CAST(substr(s.tahun_ajaran_masuk,1,4) AS INTEGER) as angkatan,
                 m.id_mapel,
                 m.nama_mapel,
                 tas.id_ta_semester,
@@ -108,10 +108,14 @@ exports.getAngkatanAnalytics = async (req, res) => {
             JOIN Siswa s ON n.id_siswa = s.id_siswa
             JOIN MataPelajaran m ON n.id_mapel = m.id_mapel
             JOIN TahunAjaranSemester tas ON n.id_ta_semester = tas.id_ta_semester
-            WHERE s.tahun_ajaran_masuk = ?
+            WHERE substr(s.tahun_ajaran_masuk, 1, 4) = ?
         `;
 
-        const params = [tahun_ajaran_masuk];
+        // Normalize to single year (first 4 digits) so input can be '2024' or '2024/2025'
+        const tahunTargetMatch = ('' + tahun_ajaran_masuk).match(/(\d{4})/);
+        const tahunTarget = tahunTargetMatch ? tahunTargetMatch[1] : tahun_ajaran_masuk;
+
+        const params = [tahunTarget];
 
         if (id_mapel) {
             query += ' AND m.id_mapel = ?';
@@ -119,7 +123,7 @@ exports.getAngkatanAnalytics = async (req, res) => {
         }
 
         query += `
-            GROUP BY s.tahun_ajaran_masuk, m.id_mapel, m.nama_mapel, tas.id_ta_semester, tas.tahun_ajaran, tas.semester
+            GROUP BY CAST(substr(s.tahun_ajaran_masuk,1,4) AS INTEGER), m.id_mapel, m.nama_mapel, tas.id_ta_semester, tas.tahun_ajaran, tas.semester
             ORDER BY tas.tahun_ajaran, tas.semester, m.nama_mapel
         `;
 
@@ -224,19 +228,103 @@ exports.getStudentAnalytics = async (req, res) => {
             // Filter out rows with no grades
             const validRows = rows.filter(row => row.nama_mapel !== null);
 
+            // Normalize angkatan to single year (first 4 digits) for consistency
+            const angkatanMatch = (studentInfo.tahun_ajaran_masuk || '').toString().match(/(\d{4})/);
+            const angkatanYear = angkatanMatch ? angkatanMatch[1] : studentInfo.tahun_ajaran_masuk;
+            // Replace studentInfo field for consistent UI display
+            studentInfo.tahun_ajaran_masuk = angkatanYear;
+
             res.json({ 
                 type: 'student',
                 student: studentInfo,
                 data: validRows,
                 summary: {
                     total_records: validRows.length,
-                    angkatan: studentInfo.tahun_ajaran_masuk
+                    angkatan: angkatanYear
                 }
             });
         });
 
     } catch (error) {
         console.error('Error in getStudentAnalytics:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+/**
+ * Get detailed per-TP grades for a student+mapel
+ * GET /api/analytics/student/:id_siswa/mapel/:id_mapel/details
+ * Query params: id_ta_semester (optional)
+ */
+exports.getStudentMapelDetails = async (req, res) => {
+    try {
+        const { id_siswa, id_mapel } = req.params;
+        const { id_ta_semester } = req.query;
+        const db = getDb();
+
+        if (!id_siswa || !id_mapel) {
+            return res.status(400).json({ message: 'Parameters id_siswa and id_mapel are required' });
+        }
+
+        let query = `
+            SELECT 
+                n.id_nilai,
+                n.id_guru,
+                n.jenis_nilai,
+                n.urutan_tp,
+                n.nilai,
+                n.tanggal_input,
+                n.keterangan,
+                n.id_kelas,
+                k.nama_kelas,
+                n.id_ta_semester,
+                tas.tahun_ajaran,
+                tas.semester,
+                (n.id_guru || '-' || n.id_mapel || '-' || n.id_kelas || '-' || n.id_ta_semester) AS id_penugasan,
+                COALESCE(
+                    mt.tp_name,
+                    (
+                        SELECT tp_name FROM manual_tp m2
+                        WHERE m2.id_penugasan = (n.id_guru || '-' || n.id_mapel || '-' || n.id_kelas || '-' || n.id_ta_semester)
+                          AND m2.tp_number = n.urutan_tp
+                        ORDER BY m2.id_ta_semester DESC
+                        LIMIT 1
+                    )
+                ) AS tp_name
+            FROM Nilai n
+            LEFT JOIN Kelas k ON n.id_kelas = k.id_kelas
+            LEFT JOIN TahunAjaranSemester tas ON n.id_ta_semester = tas.id_ta_semester
+            LEFT JOIN manual_tp mt ON mt.id_penugasan = (n.id_guru || '-' || n.id_mapel || '-' || n.id_kelas || '-' || n.id_ta_semester) AND mt.tp_number = n.urutan_tp AND mt.id_ta_semester = n.id_ta_semester
+            WHERE n.id_siswa = ? AND n.id_mapel = ?
+        `;
+
+        const params = [id_siswa, id_mapel];
+
+        if (id_ta_semester) {
+            query += ' AND n.id_ta_semester = ?';
+            params.push(id_ta_semester);
+        }
+
+        // Order by year desc, semester, then TP number
+        query += ' ORDER BY tas.tahun_ajaran DESC, tas.semester DESC, n.urutan_tp ASC';
+
+        db.all(query, params, (err, rows) => {
+            if (err) {
+                console.error('Error getting student mapel details:', err);
+                return res.status(500).json({ message: err.message });
+            }
+
+            res.json({
+                success: true,
+                student_id: id_siswa,
+                id_mapel: id_mapel,
+                total: rows.length,
+                data: rows
+            });
+        });
+
+    } catch (error) {
+        console.error('Error in getStudentMapelDetails:', error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -360,11 +448,12 @@ exports.getAngkatanList = (req, res) => {
     const db = getDb();
     
     db.all(`
-        SELECT DISTINCT tahun_ajaran_masuk as angkatan, COUNT(*) as jumlah_siswa
+        -- Group by first 4 digits (year) to support values like '2024' or '2024/2025'
+        SELECT DISTINCT CAST(substr(tahun_ajaran_masuk,1,4) AS INTEGER) as angkatan, COUNT(*) as jumlah_siswa
         FROM Siswa
-        WHERE tahun_ajaran_masuk IS NOT NULL
-        GROUP BY tahun_ajaran_masuk
-        ORDER BY tahun_ajaran_masuk DESC
+        WHERE tahun_ajaran_masuk IS NOT NULL AND tahun_ajaran_masuk != ''
+        GROUP BY CAST(substr(tahun_ajaran_masuk,1,4) AS INTEGER)
+        ORDER BY angkatan DESC
     `, [], (err, rows) => {
         if (err) {
             console.error('Error getting angkatan list:', err);

@@ -11,11 +11,23 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import StatusMessage from '../../components/StatusMessage';
 
 // Komponen Modal Edit Siswa
-const EditStudentModal = ({ student, onClose, onSave }) => {
+const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseStartYear }) => {
   const [editedStudent, setEditedStudent] = useState({ ...student });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Initialize tahun_ajaran_masuk as single-year if available, or fallback to active TA start year
+  useEffect(() => {
+    if (student && student.tahun_ajaran_masuk) {
+      const parsed = (student.tahun_ajaran_masuk || '').toString().match(/(\d{4})/);
+      setEditedStudent(prev => ({ ...prev, tahun_ajaran_masuk: parsed ? parsed[1] : student.tahun_ajaran_masuk }));
+    } else if (taSemesters && taSemesters.length > 0) {
+      const active = taSemesters.find(t => t.is_aktif);
+      const defaultYear = active ? parseStartYear(active.tahun_ajaran) : '';
+      setEditedStudent(prev => ({ ...prev, tahun_ajaran_masuk: prev.tahun_ajaran_masuk || defaultYear }));
+    }
+  }, [student, taSemesters, parseStartYear]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,7 +44,9 @@ const EditStudentModal = ({ student, onClose, onSave }) => {
       const dataToUpdate = {
         nama_siswa: editedStudent.nama_siswa,
         tanggal_lahir: editedStudent.tanggal_lahir,
-        jenis_kelamin: editedStudent.jenis_kelamin
+        jenis_kelamin: editedStudent.jenis_kelamin,
+        // Store single-year format (e.g., '2024')
+        tahun_ajaran_masuk: editedStudent.tahun_ajaran_masuk || null
       };
       
       const response = await adminApi.updateStudent(editedStudent.id_siswa, dataToUpdate);
@@ -126,6 +140,26 @@ const EditStudentModal = ({ student, onClose, onSave }) => {
               <option value="P">👩 Perempuan</option>
             </select>
           </div>
+
+          <div className="form-group">
+            <label>
+              <i className="fas fa-calendar-alt mr-2 text-gray-500"></i>
+              Tahun Masuk (Year)
+            </label>
+            <select
+              name="tahun_ajaran_masuk"
+              value={editedStudent.tahun_ajaran_masuk || ''}
+              onChange={(e) => handleChange(e)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="">-- Pilih Tahun --</option>
+              {Array.from(new Set(taSemesters.map(t => parseStartYear(t.tahun_ajaran)))).map(y => (
+                y && <option key={`edit-year-${y}`} value={y}>{y}</option>
+              ))}
+            </select>
+            <small className="text-gray-500 mt-1 block">Masukkan tahun tunggal, misal 2024</small>
+          </div>
+
           <div className="modal-actions">
             <Button 
               type="button" 
@@ -158,13 +192,21 @@ const StudentManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTASemester, setActiveTASemester] = useState(null);
+  const [taSemesters, setTaSemesters] = useState([]);
   const [newStudent, setNewStudent] = useState({
     id_siswa: '',
     nama_siswa: '',
     tanggal_lahir: '',
     jenis_kelamin: 'L',
-    tahun_ajaran_masuk: ''
+    tahun_ajaran_masuk: '' // will hold single-year like '2024'
   });
+
+  // Helper: parse first 4-digit year from '2024/2025' or other formats
+  const parseStartYear = (s) => {
+    if (!s) return '';
+    const m = String(s).match(/(\d{4})/);
+    return m ? m[1] : '';
+  };
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
@@ -189,14 +231,16 @@ const StudentManagement = () => {
 
   const fetchActiveTASemester = async () => {
     try {
-      const taSemesters = await adminApi.getTASemester();
-      const active = taSemesters.find(ta => ta.is_aktif);
+      const taList = await adminApi.getTASemester();
+      setTaSemesters(taList || []);
+
+      const active = taList.find(ta => ta.is_aktif);
       if (active) {
         setActiveTASemester(active);
-        // Auto-fill tahun_ajaran_masuk with active TA semester
+        // Auto-fill tahun_ajaran_masuk with active TA semester's START YEAR (e.g., '2024')
         setNewStudent(prev => ({
           ...prev,
-          tahun_ajaran_masuk: active.tahun_ajaran
+          tahun_ajaran_masuk: parseStartYear(active.tahun_ajaran)
         }));
       }
     } catch (err) {
@@ -369,7 +413,7 @@ const StudentManagement = () => {
           </div>
           <p className="text-xs text-gray-600 mt-3">
             <i className="fas fa-info-circle mr-1"></i>
-            Download template, isi data siswa, lalu upload kembali untuk import massal
+            Download template, isi data siswa, lalu upload kembali untuk import massal.
           </p>
         </div>
 
@@ -419,18 +463,22 @@ const StudentManagement = () => {
             <div className="form-group">
               <label>
                 <i className="fas fa-calendar-alt mr-2 text-gray-500"></i>
-                Tahun Ajaran Masuk
+                Tahun Masuk (Year)
               </label>
-              <input 
-                type="text" 
+              <select
                 value={newStudent.tahun_ajaran_masuk}
-                disabled
-                placeholder="Otomatis dari tahun ajaran aktif"
-                className="bg-gray-100 cursor-not-allowed"
-              />
+                onChange={(e) => setNewStudent({ ...newStudent, tahun_ajaran_masuk: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                required
+              >
+                <option value="">Pilih Tahun Masuk</option>
+                {Array.from(new Set(taSemesters.map(t => parseStartYear(t.tahun_ajaran)))).map(y => (
+                  y && <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
               <small className="text-gray-500 mt-1 block">
                 {activeTASemester 
-                  ? `Otomatis menggunakan tahun ajaran aktif: ${activeTASemester.tahun_ajaran} - ${activeTASemester.semester}`
+                  ? `Default: ${parseStartYear(activeTASemester.tahun_ajaran)} (TA aktif: ${activeTASemester.tahun_ajaran})`
                   : 'Memuat tahun ajaran aktif...'}
               </small>
             </div>
@@ -615,6 +663,8 @@ const StudentManagement = () => {
           student={selectedStudent}
           onClose={() => setShowEditModal(false)}
           onSave={fetchStudents}
+          taSemesters={taSemesters}
+          parseStartYear={parseStartYear}
         />
       )}
 

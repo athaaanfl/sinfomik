@@ -90,6 +90,18 @@ export const fetchStudentAnalytics = async (idSiswa, params = {}) => {
 };
 
 /**
+ * Fetch per-TP details for a student's mapel
+ * @param {number|string} idSiswa
+ * @param {number|string} idMapel
+ * @param {Object} params - { id_ta_semester? }
+ */
+export const fetchStudentMapelDetails = async (idSiswa, idMapel, params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const url = `${API_BASE_URL}/api/analytics/student/${idSiswa}/mapel/${idMapel}/details${queryString ? `?${queryString}` : ''}`;
+    return fetchWithAuth(url);
+};
+
+/**
  * Fetch guru subject analytics
  * @param {number} idGuru - Guru ID
  * @param {Object} params - { id_mapel?, id_kelas?, id_ta_semester? }
