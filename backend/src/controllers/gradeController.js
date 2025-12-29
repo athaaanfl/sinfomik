@@ -537,7 +537,7 @@ async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
             throw new Error('Kelas tidak ditemukan');
         }
 
-        // Determine semester filter
+        // Determine semester filterr
         const semesterFilter = semesterText.toLowerCase() === 'ganjil' ? 1 : 2;
 
         // Extract tingkat kelas

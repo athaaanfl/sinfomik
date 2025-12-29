@@ -10,6 +10,127 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import StatusMessage from '../../components/StatusMessage';
 
+// --- Date helpers ---------------------------------------------------------
+// Parse flexible date strings (DD-MM-YYYY, DD/MM/YYYY, DD-MM-YY, ISO, Excel serial) into ISO YYYY-MM-DD
+const parseDateFlexible = (input) => {
+  if (!input && input !== 0) return null;
+  // If already YYYY-MM-DD
+  const s = String(input).trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  // DD-MM-YYYY or DD/MM/YYYY or DD-MM-YY or DD/MM/YY
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (dmy) {
+    let day = dmy[1].padStart(2, '0');
+    let month = dmy[2].padStart(2, '0');
+    let year = dmy[3];
+    if (year.length === 2) {
+      const yy = parseInt(year, 10);
+      year = (yy >= 70 ? 1900 + yy : 2000 + yy).toString();
+    }
+    return `${year}-${month}-${day}`;
+  }
+
+  // Excel serial number (as number)
+  if (!isNaN(Number(s))) {
+    const n = Number(s);
+    // heuristic: if > 59 treat as Excel serial (dates after 1900)
+    if (n > 59) {
+      const date = new Date(Math.round((n - 25569) * 86400 * 1000));
+      if (!isNaN(date)) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+  }
+
+  // Fallback: try Date.parse
+  const parsed = Date.parse(s);
+  if (!isNaN(parsed)) {
+    const date = new Date(parsed);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+};
+
+// Format ISO or other inputs to display DD-MM-YYYY (for table)
+const formatDateDisplay = (input) => {
+  if (!input && input !== 0) return '-';
+  const iso = parseDateFlexible(input);
+  if (!iso) return String(input);
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(input);
+  return `${m[3]}-${m[2]}-${m[1]}`; // DD-MM-YYYY
+};
+
+// Preprocess Excel file to normalize Tanggal Lahir to ISO YYYY-MM-DD when possible
+const preprocessExcelFile = async (file) => {
+  try {
+    const XLSX = await import('xlsx');
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+    // Find header row containing NISN and NAMA
+    let headerRowIndex = -1;
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      if (Array.isArray(row) && row.length >= 2) {
+        const hasNisn = row.some(cell => cell && String(cell).toUpperCase().includes('NISN'));
+        const hasNama = row.some(cell => cell && String(cell).toUpperCase().includes('NAMA'));
+        if (hasNisn && hasNama) { headerRowIndex = i; break; }
+      }
+    }
+    if (headerRowIndex === -1) return file;
+
+    const headers = data[headerRowIndex].map(h => h ? String(h).toUpperCase() : '');
+    const tglIndex = headers.findIndex(h => h.includes('TANGGAL') || h.includes('LAHIR'));
+    if (tglIndex === -1) return file;
+
+    const rows = data.slice();
+    for (let r = headerRowIndex + 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row || row.length === 0) continue;
+      const cell = row[tglIndex];
+      if (cell === undefined || cell === null || cell === '') continue;
+
+      let dateStr = '';
+      if (typeof cell === 'number') {
+        const date = new Date(Math.round((cell - 25569) * 86400 * 1000));
+        if (!isNaN(date)) dateStr = date.toISOString().slice(0, 10);
+      } else if (cell instanceof Date) {
+        dateStr = cell.toISOString().slice(0, 10);
+      } else if (typeof cell === 'string') {
+        const iso = parseDateFlexible(cell);
+        if (iso) dateStr = iso;
+        else {
+          const parsed = Date.parse(cell);
+          if (!isNaN(parsed)) dateStr = new Date(parsed).toISOString().slice(0, 10);
+        }
+      }
+
+      if (dateStr) row[tglIndex] = dateStr;
+    }
+
+    const newSheet = XLSX.utils.aoa_to_sheet(rows);
+    workbook.Sheets[sheetName] = newSheet;
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const newFile = new File([wbout], file.name, { type: file.type });
+    return newFile;
+  } catch (err) {
+    console.warn('Preprocess Excel failed, uploading original file:', err?.message || err);
+    return file;
+  }
+};
+
 // Komponen Modal Edit Siswa
 const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseStartYear }) => {
   const [editedStudent, setEditedStudent] = useState({ ...student });
@@ -27,6 +148,12 @@ const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseSta
       const defaultYear = active ? parseStartYear(active.tahun_ajaran) : '';
       setEditedStudent(prev => ({ ...prev, tahun_ajaran_masuk: prev.tahun_ajaran_masuk || defaultYear }));
     }
+
+    // Normalize tanggal_lahir for date input (ensure ISO YYYY-MM-DD)
+    if (student && student.tanggal_lahir) {
+      const iso = parseDateFlexible(student.tanggal_lahir) || student.tanggal_lahir;
+      setEditedStudent(prev => ({ ...prev, tanggal_lahir: iso }));
+    }
   }, [student, taSemesters, parseStartYear]);
 
   const handleChange = (e) => {
@@ -43,7 +170,7 @@ const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseSta
     try {
       const dataToUpdate = {
         nama_siswa: editedStudent.nama_siswa,
-        tanggal_lahir: editedStudent.tanggal_lahir,
+        tanggal_lahir: parseDateFlexible(editedStudent.tanggal_lahir) || editedStudent.tanggal_lahir,
         jenis_kelamin: editedStudent.jenis_kelamin,
         // Store single-year format (e.g., '2024')
         tahun_ajaran_masuk: editedStudent.tahun_ajaran_masuk || null
@@ -281,7 +408,8 @@ const StudentManagement = () => {
     
     try {
       const { id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk } = newStudent;
-      const response = await adminApi.addStudent({ id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk });
+      const tanggalIso = parseDateFlexible(tanggal_lahir) || tanggal_lahir || null;
+      const response = await adminApi.addStudent({ id_siswa, nama_siswa, tanggal_lahir: tanggalIso, jenis_kelamin, tahun_ajaran_masuk });
       showMessage(response.message);
       setNewStudent({
         id_siswa: '',
@@ -338,7 +466,9 @@ const StudentManagement = () => {
     showMessage('⏳ Mengupload dan memproses file...', 'info');
 
     try {
-      const result = await adminApi.importStudents(file);
+      // Preprocess Excel to normalize date columns (if possible)
+      const processedFile = await preprocessExcelFile(file);
+      const result = await adminApi.importStudents(processedFile);
       
       if (result.details && result.details.errors && result.details.errors.length > 0) {
         showMessage(`⚠️ ${result.message}\nError: ${result.details.errors.slice(0, 3).join(', ')}`, 'warning');
@@ -423,7 +553,7 @@ const StudentManagement = () => {
         </h4>
         <form onSubmit={handleAddStudent} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-group">
-              <label>ID Siswa (NISN)</label>
+              <label>NIS</label>
               <input 
                 type="number" 
                 value={newStudent.id_siswa}
@@ -558,9 +688,10 @@ const StudentManagement = () => {
                     label: 'Tanggal Lahir', 
                     sortable: true,
                     render: (value) => (
-                      <span className="text-gray-700">{value || '-'}</span>
+                      <span className="text-gray-700">{formatDateDisplay(value)}</span>
                     )
                   },
+
                   { 
                     key: 'jenis_kelamin', 
                     label: 'Jenis Kelamin', 
