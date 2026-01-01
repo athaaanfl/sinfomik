@@ -25,10 +25,15 @@ function initializePool() {
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT) || 5432,
         database: process.env.DB_NAME || 'sinfomik',
-        // Connection pool settings
-        max: parseInt(process.env.DB_POOL_MAX) || 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        // Connection pool settings - IMPROVED for DDoS resilience
+        max: parseInt(process.env.DB_POOL_MAX) || 50, // INCREASED: 50 connections (was 20)
+        min: parseInt(process.env.DB_POOL_MIN) || 5, // ADDED: Keep 5 connections always alive
+        idleTimeoutMillis: 30000, // Close idle connections after 30s
+        connectionTimeoutMillis: 5000, // INCREASED: Wait 5s for connection (was 2s)
+        // Query timeout
+        statement_timeout: parseInt(process.env.DB_QUERY_TIMEOUT) || 30000, // Kill queries > 30s
+        // Health check
+        allowExitOnIdle: false, // Don't exit when all clients idle
     };
 
     pool = new Pool(config);
@@ -37,9 +42,30 @@ function initializePool() {
         console.error('Unexpected error on idle client', err);
     });
 
-    pool.on('connect', () => {
+    pool.on('connect', (client) => {
         console.log('✅ New client connected to PostgreSQL');
+        // Set statement timeout for this connection
+        client.query('SET statement_timeout = 30000'); // 30 seconds
     });
+    
+    pool.on('acquire', (client) => {
+        // Track when connections are acquired
+    });
+    
+    pool.on('remove', (client) => {
+        console.log('⚠️  Client removed from pool');
+    });
+    
+    // Health check - log pool stats every 30 seconds
+    setInterval(() => {
+        const totalCount = pool.totalCount;
+        const idleCount = pool.idleCount;
+        const waitingCount = pool.waitingCount;
+        
+        if (waitingCount > 0 || (totalCount - idleCount) > 40) {
+            console.warn(`🚨 DB Pool Status: Total=${totalCount}, Active=${totalCount - idleCount}, Idle=${idleCount}, Waiting=${waitingCount}`);
+        }
+    }, 30000);
 
     return pool;
 }

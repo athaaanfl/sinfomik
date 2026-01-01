@@ -10,6 +10,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { getDb } = require('./config/db'); // Import PostgreSQL adapter
 const initializeDatabasePostgres = require('./init_db_postgres_simple'); // Import database initialization (simplified, idempotent)
+const { expensiveQueueMiddleware, moderateQueueMiddleware, lightQueueMiddleware, getQueueStats } = require('./middlewares/requestQueueMiddleware');
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const guruRoutes = require('./routes/guruRoutes');
@@ -52,9 +53,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // 3. Rate Limiting - Prevent brute force attacks
+// IMPROVED: Much stricter limits to prevent DDoS
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 2000, // Limit each IP to 2000 requests per windowMs (development)
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 200 : 1000), // REDUCED: 200 for prod, 1000 for dev
     message: {
         error: 'Too many requests',
         message: 'Anda telah mencapai batas request. Silakan tunggu beberapa saat sebelum mencoba lagi.',
@@ -63,7 +65,7 @@ const limiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res) => {
-        console.log(`⚠️  Rate limit exceeded for IP: ${req.ip}`);
+        console.log(`⚠️  Rate limit exceeded for IP: ${req.ip} on ${req.path}`);
         res.status(429).json({
             error: 'Too many requests',
             message: 'Anda telah mencapai batas request. Silakan tunggu beberapa saat sebelum mencoba lagi.',
@@ -78,33 +80,123 @@ app.use('/api', limiter);
 // Stricter rate limit for auth routes
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === 'production' ? 50 : 500, // 500 untuk development, 50 untuk production
+    max: process.env.NODE_ENV === 'production' ? 20 : 100, // REDUCED: 20 for prod (was 50), 100 for dev
     message: 'Terlalu banyak percobaan login. Silakan coba lagi setelah 15 menit.',
     skipSuccessfulRequests: true, // Don't count successful requests
+    handler: (req, res) => {
+        console.warn(`🚨 Auth rate limit exceeded for IP: ${req.ip}`);
+        res.status(429).json({
+            error: 'Too many login attempts',
+            message: 'Terlalu banyak percobaan login. Silakan coba lagi setelah 15 menit.'
+        });
+    }
+});
+
+// ADDED: Very strict limit for expensive operations (analytics, exports)
+// Note: File uploads have separate concurrency control via multer + queue
+const expensiveOpLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: process.env.NODE_ENV === 'production' ? 10 : 50, // Only 10 requests per 5 min in production
+    message: 'Operasi ini memerlukan banyak sumber daya. Silakan tunggu beberapa saat.',
+    handler: (req, res) => {
+        console.warn(`🚨 Expensive operation limit exceeded for IP: ${req.ip} on ${req.path}`);
+        res.status(429).json({
+            error: 'Rate limit exceeded',
+            message: 'Operasi ini memerlukan banyak sumber daya. Silakan tunggu beberapa saat.',
+            retryAfter: 300 // 5 minutes in seconds
+        });
+    }
+});
+
+// ADDED: Moderate limit for general read operations
+const readLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: process.env.NODE_ENV === 'production' ? 60 : 200, // 60 per minute in production
+    message: 'Terlalu banyak permintaan. Silakan tunggu sebentar.',
 });
 
 // 4. Body parser with size limits
-app.use(express.json({ limit: '10mb' })); // Limit request body size
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// NOTE: File uploads are handled separately by multer (configured per route with 5MB limit)
+// This limit affects JSON/form-encoded request bodies. Set to 10MB for large Excel data processing
+app.use(express.json({ limit: process.env.MAX_JSON_SIZE || '10mb' })); // Allow large JSON for Excel data
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Allow large form data
+
+// Special handling for file uploads (will be handled by multer in routes)
 
 // ===============================
 // ROUTES
 // ===============================
 
 // Auth routes with stricter rate limiting
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authLimiter, lightQueueMiddleware, authRoutes);
 
-// Protected routes (will add auth middleware in routes files)
-app.use('/api/admin', adminRoutes);
-app.use('/api/guru', guruRoutes);
-app.use('/api/excel', excelRoutes);
-app.use('/api/grades', gradeRoutes);
-app.use('/api/kkm', kkmRoutes);
-app.use('/api/analytics', analyticsRoutes);
+// IMPROVED: Apply appropriate rate limiters + queue middleware per route group
+// Expensive operations (analytics, exports) - very strict
+app.use('/api/analytics', expensiveOpLimiter, expensiveQueueMiddleware, analyticsRoutes);
+app.use('/api/excel', expensiveOpLimiter, expensiveQueueMiddleware, excelRoutes);
+
+// Protected routes with moderate rate limiting + queue
+app.use('/api/admin', readLimiter, moderateQueueMiddleware, adminRoutes);
+app.use('/api/guru', readLimiter, moderateQueueMiddleware, guruRoutes);
+app.use('/api/grades', readLimiter, moderateQueueMiddleware, gradeRoutes);
+app.use('/api/kkm', readLimiter, moderateQueueMiddleware, kkmRoutes);
 
 // Health check endpoint (before static files)
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ADDED: Detailed health check with DB and metrics
+app.get('/api/health/detailed', async (req, res) => {
+    const health = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        database: 'unknown',
+        queue: getQueueStats()
+    };
+
+    // Check database connection
+    try {
+        const db = getDb();
+        await new Promise((resolve, reject) => {
+            db.get('SELECT 1', [], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        health.database = 'connected';
+    } catch (err) {
+        health.status = 'degraded';
+        health.database = 'disconnected';
+        health.error = err.message;
+    }
+
+    const statusCode = health.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(health);
+});
+
+// ADDED: Metrics endpoint for monitoring
+app.get('/api/metrics', (req, res) => {
+    // Only allow from localhost or with auth token
+    const allowedIPs = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
+    if (!allowedIPs.includes(req.ip) && req.headers['authorization'] !== `Bearer ${process.env.METRICS_TOKEN}`) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const metrics = {
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        cpu: process.cpuUsage(),
+        queue: getQueueStats(),
+        nodeVersion: process.version,
+        platform: process.platform,
+        env: process.env.NODE_ENV || 'development'
+    };
+
+    res.json(metrics);
 });
 
 // API routes check
@@ -168,6 +260,40 @@ function startServer(port, attempt = 0) {
         console.log(`🌐 Frontend URL: ${FRONTEND_URL}`);
         console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}\n`);
     });
+    
+    // ===============================
+    // DDOS PROTECTION: HTTP TIMEOUTS
+    // ===============================
+    // Prevent Slowloris attacks
+    srv.timeout = 30000; // 30 seconds - force close slow requests
+    srv.keepAliveTimeout = 65000; // 65 seconds - slightly longer than typical load balancer timeout (60s)
+    srv.headersTimeout = 66000; // Must be > keepAliveTimeout
+    
+    // Limit concurrent connections per IP (basic protection)
+    srv.maxConnections = process.env.MAX_CONNECTIONS || 500; // Max 500 concurrent connections total
+    
+    // Track connections for monitoring
+    let activeConnections = 0;
+    srv.on('connection', (socket) => {
+        activeConnections++;
+        socket.on('close', () => {
+            activeConnections--;
+        });
+        
+        // Force close idle connections after timeout
+        socket.setTimeout(45000); // 45 seconds for socket idle
+        socket.on('timeout', () => {
+            console.warn(`⚠️  Socket timeout - closing connection from ${socket.remoteAddress}`);
+            socket.destroy();
+        });
+    });
+    
+    // Log active connections every minute (for monitoring)
+    setInterval(() => {
+        if (activeConnections > 100) {
+            console.log(`📊 Active connections: ${activeConnections}`);
+        }
+    }, 60000);
     srv.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
             const nextPort = port + 1;
@@ -183,6 +309,42 @@ function startServer(port, attempt = 0) {
             process.exit(1);
         }
     });
+    
+    // ===============================
+    // GRACEFUL SHUTDOWN
+    // ===============================
+    const gracefulShutdown = async (signal) => {
+        console.log(`\n⚠️  ${signal} received. Starting graceful shutdown...`);
+        
+        // Stop accepting new connections
+        srv.close(async () => {
+            console.log('✅ HTTP server closed');
+            
+            // Close database connections
+            try {
+                const { closePool } = require('./config/db');
+                await closePool();
+                console.log('✅ Database pool closed');
+            } catch (err) {
+                console.error('❌ Error closing database:', err);
+            }
+            
+            console.log('✅ Graceful shutdown complete');
+            process.exit(0);
+        });
+        
+        // Force exit if graceful shutdown takes too long
+        setTimeout(() => {
+            console.error('⚠️  Graceful shutdown timeout - forcing exit');
+            process.exit(1);
+        }, 10000); // 10 seconds timeout
+    };
+    
+    // Handle shutdown signals
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    
+    return srv;
 }
 
 // Initialize database then start server

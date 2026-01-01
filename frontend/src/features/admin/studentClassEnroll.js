@@ -108,21 +108,22 @@ const StudentClassEnroll = ({ activeTASemester }) => {
     fetchAllStudentsInSemester(activeTASemester?.id_ta_semester);
   }, [selectedKelasId, activeTASemester, kelas]);
 
-  // Auto-refresh data ketika tab/window di-focus kembali
-  useEffect(() => {
-    const handleFocus = () => {
-      if (isImporting || waitingForFile) {
-        // Avoid auto refresh during an ongoing import (avoids confusing UI refresh)
-        console.log('Window focused but import in progress; skipping auto-refresh');
-        return;
-      }
-      console.log('Window focused, refreshing data');
-      fetchData();
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [isImporting, waitingForFile]);
+  // REMOVED: Auto-refresh on window focus (caused annoying UX issues)
+  // Users reported that switching tabs caused unwanted page refresh
+  // If auto-refresh is needed, use manual refresh button instead
+  // useEffect(() => {
+  //   const handleFocus = () => {
+  //     if (isImporting || waitingForFile) {
+  //       console.log('Window focused but import in progress; skipping auto-refresh');
+  //       return;
+  //     }
+  //     console.log('Window focused, refreshing data');
+  //     fetchData();
+  //   };
+  //   
+  //   window.addEventListener('focus', handleFocus);
+  //   return () => window.removeEventListener('focus', handleFocus);
+  // }, [isImporting, waitingForFile]);
   
 
   const showMessage = (text, type = 'success') => {
