@@ -11,7 +11,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import StatusMessage from '../../components/StatusMessage';
 import EmptyState from '../../components/EmptyState';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 
 // Komponen Modal ATP Viewer (dengan Edit Mode)
 const AtpViewerModal = ({ id_mapel, fase, nama_mapel, onClose }) => {

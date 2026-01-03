@@ -1,5 +1,5 @@
 // frontend/src/api/admin.js
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 
 // --- Fungsi Umum untuk Panggilan API dengan JWT ---
 const fetchData = async (url, options = {}) => {

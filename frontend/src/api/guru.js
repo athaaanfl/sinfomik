@@ -3,7 +3,9 @@ import { getTipeNilai, getMataPelajaran } from './admin'; // getMataPelajaran ju
 export { getTipeNilai, getMataPelajaran }; // Ekspor ulang agar bisa digunakan oleh modul lain
 
 // frontend/src/api/guru.js
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+// Production: Empty string (Nginx proxy)  
+// Development: set REACT_APP_API_BASE_URL='http://localhost:5000' in .env.local
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
 
 // --- API untuk Tahun Ajaran & Semester (Read-only for Guru) ---
 export const getTASemester = async () => {
