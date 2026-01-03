@@ -2,7 +2,19 @@
 // Load environment variables FIRST, before requiring anything else
 const dotenv = require('dotenv');
 const path = require('path');
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+
+// Try loading .env from root first, fallback to backend/.env
+const rootEnvPath = path.join(__dirname, '../../.env');
+const backendEnvPath = path.join(__dirname, '../.env');
+if (require('fs').existsSync(rootEnvPath)) {
+    dotenv.config({ path: rootEnvPath });
+    console.log('✅ Loaded .env from root directory');
+} else if (require('fs').existsSync(backendEnvPath)) {
+    dotenv.config({ path: backendEnvPath });
+    console.log('✅ Loaded .env from backend directory');
+} else {
+    console.warn('⚠️  No .env file found, using system environment variables');
+}
 
 const express = require('express');
 const cors = require('cors');
@@ -42,10 +54,22 @@ app.use(helmet({
 // 2. CORS - Configure properly untuk specific origin
 // In production, if frontend is served from same domain, allow same origin
 // In development, allow localhost:3000
+const getAllowedOrigins = () => {
+    const defaultOrigins = process.env.NODE_ENV === 'production' 
+        ? [FRONTEND_URL]
+        : ['http://localhost:3000', 'http://localhost:3001'];
+    
+    // Allow additional origins from environment variable (comma-separated)
+    if (process.env.ALLOWED_ORIGINS) {
+        const additionalOrigins = process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
+        return [...defaultOrigins, ...additionalOrigins];
+    }
+    
+    return defaultOrigins;
+};
+
 const corsOptions = {
-    origin: process.env.NODE_ENV === 'production' 
-        ? [FRONTEND_URL, 'https://*.azurewebsites.net', 'https://*.azurestaticapps.net', 'https://sinfomik-backend-gzcng8eucydhgucz.southeastasia-01.azurewebsites.net', 'https://salmon-glacier-082ece600.3.azurestaticapps.net'] // Allow Azure domains
-        : ['http://localhost:3000', 'http://localhost:3001'], // Development
+    origin: getAllowedOrigins(),
     credentials: true,
     exposedHeaders: ['Content-Disposition']
 };

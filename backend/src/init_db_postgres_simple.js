@@ -3,13 +3,53 @@
 
 const { Pool } = require('pg');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+const fs = require('fs');
+
+// Try loading .env from root first (recommended), fallback to backend/.env
+const rootEnvPath = path.join(__dirname, '..', '..', '.env');
+const backendEnvPath = path.join(__dirname, '..', '.env');
+
+if (fs.existsSync(rootEnvPath)) {
+    require('dotenv').config({ path: rootEnvPath });
+    console.log(`✅ Loaded .env from: ${rootEnvPath} (root)`);
+} else if (fs.existsSync(backendEnvPath)) {
+    require('dotenv').config({ path: backendEnvPath });
+    console.log(`✅ Loaded .env from: ${backendEnvPath} (backend)`);
+} else {
+    console.warn(`⚠️  No .env file found. Checked:`);
+    console.warn(`   - ${rootEnvPath}`);
+    console.warn(`   - ${backendEnvPath}`);
+    console.log('Using environment variables from system...');
+}
+
+// Validate required environment variables
+const requiredEnvVars = ['DB_USER', 'DB_PASSWORD', 'DB_NAME', 'DB_HOST'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+    console.error('\n❌ Missing required environment variables:');
+    missingVars.forEach(varName => console.error(`   - ${varName}`));
+    console.error('\nPlease create a .env file in the backend directory with:');
+    console.error('   DB_USER=your_username');
+    console.error('   DB_PASSWORD=your_password');
+    console.error('   DB_HOST=localhost');
+    console.error('   DB_PORT=5432');
+    console.error('   DB_NAME=your_database_name');
+    console.error('\nSee backend/.env.production.example for reference.');
+    process.exit(1);
+}
+
+console.log('🔍 Database configuration:');
+console.log(`   Host: ${process.env.DB_HOST}:${process.env.DB_PORT || 5432}`);
+console.log(`   Database: ${process.env.DB_NAME}`);
+console.log(`   User: ${process.env.DB_USER}`);
+console.log('');
 
 const pool = new Pool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+    port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME,
 });
 

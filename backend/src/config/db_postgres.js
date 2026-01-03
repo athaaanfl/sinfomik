@@ -6,18 +6,31 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables
-require('dotenv').config();
+// Load environment variables from root
+// Note: .env should be in project root or backend directory
+require('dotenv').config({ path: path.join(__dirname, '../../../.env') });
 
 let pool;
 
 function initializePool() {
+    // Validate required environment variables
+    const requiredEnvVars = ['DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    
+    if (missingVars.length > 0) {
+        throw new Error(
+            `❌ Missing required database environment variables: ${missingVars.join(', ')}\n` +
+            'Please check your .env file and ensure all required variables are set.\n' +
+            'See .env.example for reference.'
+        );
+    }
+
     const config = {
-        user: process.env.DB_USER || 'sinfomik_user',
-        password: process.env.DB_PASSWORD || 'sinfomik123',
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
         host: process.env.DB_HOST || 'localhost',
         port: process.env.DB_PORT || 5432,
-        database: process.env.DB_NAME || 'sinfomik',
+        database: process.env.DB_NAME,
         // Connection pool settings
         max: parseInt(process.env.DB_POOL_MAX) || 20,
         idleTimeoutMillis: 30000,

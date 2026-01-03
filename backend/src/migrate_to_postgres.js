@@ -4,7 +4,7 @@
 const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '../../.env') }); // Load from root
 
 // SQLite connection (optional - only used if a SQLite file is present)
 const sqliteDbPath = process.env.DB_PATH || path.resolve(__dirname, '../academic_dashboard.db');
@@ -21,11 +21,11 @@ if (fs.existsSync(sqliteDbPath)) {
 
 // PostgreSQL connection
 const pgPool = new Pool({
-    user: process.env.DB_USER || 'sinfomik_user',
-    password: process.env.DB_PASSWORD || 'sinfomik123',
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'sinfomik',
+    database: process.env.DB_NAME,
 });
 
 // Safety: Prevent accidental runs against remote hosts.

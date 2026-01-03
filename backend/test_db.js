@@ -3,14 +3,15 @@ const { Pool } = require('pg');
 const dotenv = require('dotenv');
 const path = require('path');
 
+// Load .env from root directory
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const pool = new Pool({
-    user: process.env.DB_USER || 'sinfomik_user',
-    password: process.env.DB_PASSWORD || 'sinfomik123',
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
     host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'sinfomik',
+    port: parseInt(process.env.DB_PORT) || 5432,
+    database: process.env.DB_NAME,
 });
 
 async function test() {
