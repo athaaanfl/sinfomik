@@ -1,9 +1,10 @@
-// Import ini harus di bagian paling atas file
-import { getTipeNilai, getMataPelajaran } from './admin'; // getMataPelajaran juga dibutuhkan
-export { getTipeNilai, getMataPelajaran }; // Ekspor ulang agar bisa digunakan oleh modul lain
-
 // frontend/src/api/guru.js
-import { API_BASE_URL } from '../config/apiConfig';
+import { getTipeNilai, getMataPelajaran } from './admin';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
+// Re-export from admin for convenience
+export { getTipeNilai, getMataPelajaran };
 
 // --- API untuk Tahun Ajaran & Semester (Read-only for Guru) ---
 export const getTASemester = async () => {

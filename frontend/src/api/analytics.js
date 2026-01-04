@@ -1,5 +1,5 @@
 // frontend/src/api/analytics.js
-import { API_BASE_URL } from '../config/apiConfig';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 // Helper to add JWT token to requests
 const fetchWithAuth = async (url, options = {}) => {
