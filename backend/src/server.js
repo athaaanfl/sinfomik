@@ -56,7 +56,7 @@ app.use(helmet({
 // In development, allow localhost:3000
 const getAllowedOrigins = () => {
     const defaultOrigins = process.env.NODE_ENV === 'production' 
-        ? [FRONTEND_URL]
+        ? ['https://sinfokas.online', 'https://www.sinfokas.online', 'http://34.123.111.227']
         : ['http://localhost:3000', 'http://localhost:3001'];
     
     // Allow additional origins from environment variable (comma-separated)

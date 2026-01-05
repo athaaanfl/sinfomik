@@ -84,15 +84,19 @@ registerRoute(
   })
 );
 
-// Cache API requests with Stale While Revalidate for better offline experience
+// Cache API GET requests only with Stale While Revalidate
+// POST/PUT/DELETE should NOT be cached (untuk mutations)
 registerRoute(
-  ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/api/'),
+  ({ url, request }) => 
+    url.origin === self.location.origin && 
+    url.pathname.startsWith('/api/') &&
+    request.method === 'GET', // ✅ Hanya cache GET request
   new StaleWhileRevalidate({
     cacheName: 'api-cache',
     plugins: [
       new ExpirationPlugin({
         maxEntries: 50,
-        maxAgeSeconds: 5 * 60, // 5 minutes
+        maxAgeSeconds: 2 * 60, // 2 minutes (lebih pendek)
       }),
     ],
   })

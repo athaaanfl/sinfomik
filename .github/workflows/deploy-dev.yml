@@ -1,0 +1,100 @@
+name: Deploy to Development (Server Belajar)
+
+on:
+  push:
+    branches:
+      - dev  # Trigger saat push ke branch dev (SERVER BELAJAR)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: |
+          frontend/package-lock.json
+          backend/package-lock.json
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+      env:
+        REACT_APP_API_BASE_URL: ${{ secrets.DEV_REACT_APP_API_BASE_URL }}
+        GENERATE_SOURCEMAP: false
+    
+    - name: Deploy to Development Server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.DEV_SERVER_HOST }}
+        username: ${{ secrets.DEV_SERVER_USER }}
+        key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+        script: |
+          # Stop backend
+          pm2 stop sinfomik-backend || true
+          
+          # Backup current version
+          cd /var/www
+          if [ -d sinfomik.backup ]; then rm -rf sinfomik.backup; fi
+          if [ -d sinfomik ]; then cp -r sinfomik sinfomik.backup; fi
+          
+          # Create directories if not exist
+          mkdir -p /var/www/sinfomik/frontend/build
+          mkdir -p /var/www/sinfomik/backend
+    
+    - name: Upload frontend build
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.DEV_SERVER_HOST }}
+        username: ${{ secrets.DEV_SERVER_USER }}
+        key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+        source: "frontend/build/*"
+        target: "/var/www/sinfomik"
+        strip_components: 1
+        rm: true
+    
+    - name: Upload backend
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.DEV_SERVER_HOST }}
+        username: ${{ secrets.DEV_SERVER_USER }}
+        key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+        source: "backend/*"
+        target: "/var/www/sinfomik"
+        strip_components: 0
+    
+    - name: Install dependencies and restart
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.DEV_SERVER_HOST }}
+        username: ${{ secrets.DEV_SERVER_USER }}
+        key: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+        script: |
+          cd /var/www/sinfomik/backend
+          
+          # Install dependencies
+          npm ci --production
+          
+          # Start backend with PM2
+          pm2 restart sinfomik-backend || pm2 start src/server.js --name sinfomik-backend
+          pm2 save
+          
+          # Restart nginx
+          sudo systemctl reload nginx
+          
+          # Show status
+          pm2 status
+          
+          echo "✅ Development deployment completed!"
