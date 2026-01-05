@@ -51,6 +51,15 @@ exports.login = (req, res) => {
             } else {
                 console.log(`✅ Session initialized for admin (source=${authSource}): ${displayName} at timestamp ${issuedAt}`);
             }
+            
+            // Set JWT token sebagai HTTP-only cookie (XSS protection)
+            res.cookie('authToken', token, {
+                httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
+                secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // CSRF protection
+                maxAge: 5 * 60 * 60 * 1000  // 5 hours (sesuai JWT_EXPIRES_IN)
+            });
+            
             res.status(200).json({
                 success: true,
                 message: 'Login berhasil!',
@@ -61,8 +70,8 @@ exports.login = (req, res) => {
                     role: roleForToken || 'admin',
                     auth_source: authSource,
                     auth_id: authId
-                },
-                token: token
+                }
+                // Token tidak dikirim di response body untuk keamanan
             });
         });
     };
@@ -184,6 +193,15 @@ exports.login = (req, res) => {
                 } else {
                     console.log(`✅ Session initialized for guru: ${user.nama_guru} at timestamp ${issuedAt}`);
                 }
+                
+                // Set JWT token sebagai HTTP-only cookie (XSS protection)
+                res.cookie('authToken', token, {
+                    httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
+                    secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
+                    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // CSRF protection
+                    maxAge: 5 * 60 * 60 * 1000  // 5 hours (sesuai JWT_EXPIRES_IN)
+                });
+                
                 res.status(200).json({
                     success: true,
                     message: 'Login berhasil! (guru)',
@@ -192,8 +210,8 @@ exports.login = (req, res) => {
                         username: user.nama_guru,
                         type: 'guru',
                         is_admin: !!user.is_admin
-                    },
-                    token: token
+                    }
+                    // Token tidak dikirim di response body untuk keamanan
                 });
             });
         });
@@ -217,5 +235,59 @@ exports.getCurrentUser = (req, res) => {
             auth_id: user.auth_id || null
         },
         message: 'Token masih aktif'
+    });
+};
+
+// Endpoint untuk logout - clear HTTP-only cookie dan invalidate session
+exports.logout = (req, res) => {
+    const { getDb } = require('../config/db');
+    
+    // Get token dari cookie atau header
+    let token = req.cookies?.authToken;
+    if (!token) {
+        token = req.headers['authorization']?.split(' ')[1];
+    }
+    
+    // Jika ada token, invalidate session di database
+    if (token) {
+        try {
+            const jwt = require('jsonwebtoken');
+            const JWT_SECRET = process.env.JWT_SECRET || 'sinfomik_super_secret_key_2025_change_in_production_please';
+            const decoded = jwt.verify(token, JWT_SECRET);
+            
+            const db = getDb();
+            const tableName = decoded.auth_source || (decoded.user_type === 'admin' ? 'Admin' : 'Guru');
+            const idField = tableName === 'Admin' ? 'id_admin' : 'id_guru';
+            const idToUpdate = decoded.auth_id || decoded.id;
+            
+            // Update last_login_timestamp to NOW to invalidate all old tokens
+            const updateQuery = `UPDATE ${tableName} SET last_login_timestamp = $1 WHERE ${idField} = $2`;
+            const newTimestamp = Math.floor(Date.now() / 1000) + 1; // Future timestamp
+            
+            db.run(updateQuery, [newTimestamp, idToUpdate], (err) => {
+                if (err) {
+                    console.error('Failed to invalidate session:', err);
+                } else {
+                    console.log(`✅ Session invalidated for user ${decoded.nama || decoded.id}`);
+                }
+            });
+        } catch (error) {
+            console.error('Error decoding token during logout:', error.message);
+        }
+    }
+    
+    // Clear the HTTP-only cookie
+    res.clearCookie('authToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/'
+    });
+    
+    console.log('✅ User logged out, HTTP-only cookie cleared and session invalidated');
+    
+    res.status(200).json({
+        success: true,
+        message: 'Logout berhasil'
     });
 };

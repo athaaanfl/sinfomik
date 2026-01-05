@@ -7,6 +7,9 @@ const { verifyToken } = require('../middlewares/authMiddleware');
 // Endpoint untuk login
 router.post('/login', authController.login);
 
+// Endpoint untuk logout - clear HTTP-only cookie
+router.post('/logout', authController.logout);
+
 // Endpoint untuk verify token (protected route)
 router.get('/me', verifyToken, authController.getCurrentUser);
 

@@ -592,12 +592,45 @@ const ImportExcel = ({ onImportSuccess }) => {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const link = document.createElement('a');
+    link.href = '/ATP Math.xlsx';
+    link.download = 'Template_ATP.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <FormSection 
       title="Import dari Excel" 
       icon="file-excel"
       variant="warning"
     >
+      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0">
+            <i className="fas fa-info-circle text-blue-500 text-xl"></i>
+          </div>
+          <div className="flex-1">
+            <h4 className="font-semibold text-blue-900 mb-2">Template Excel ATP</h4>
+            <p className="text-sm text-blue-800 mb-3">
+              Untuk memudahkan input data ATP, silakan download template Excel berikut. 
+              Pastikan format dan struktur kolom sesuai dengan template.
+            </p>
+            <Button
+              type="button"
+              variant="info"
+              icon="download"
+              size="sm"
+              onClick={handleDownloadTemplate}
+            >
+              Download Template Excel
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <input

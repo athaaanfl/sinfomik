@@ -7,8 +7,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'sinfomik_super_secret_key_2025_cha
 exports.verifyToken = (req, res, next) => {
     const { getDb } = require('../config/db');
     
-    // Get token from header
-    const token = req.headers['authorization']?.split(' ')[1]; // Expected format: "Bearer <token>"
+    // Get token from HTTP-only cookie first, fallback to Authorization header (backward compatibility)
+    let token = req.cookies?.authToken; // Prioritas: Cookie (lebih aman)
+    
+    if (!token) {
+        // Fallback: Cek Authorization header untuk backward compatibility
+        token = req.headers['authorization']?.split(' ')[1];
+    }
     
     if (!token) {
         return res.status(401).json({ 

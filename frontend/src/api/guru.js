@@ -15,13 +15,12 @@ export const getTASemester = async () => {
 export const changePassword = async (oldPassword, newPassword) => {
   // Fungsi khusus yang TIDAK redirect saat 401 (password salah)
   try {
-    const token = localStorage.getItem('token');
-    
+    // ✅ Token dikirim otomatis via HTTP-only cookie
     const response = await fetch(`${API_BASE_URL}/api/guru/change-password`, {
       method: 'POST',
+      credentials: 'include', // ✅ Kirim HTTP-only cookies
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ oldPassword, newPassword })
     });
@@ -43,17 +42,10 @@ export const changePassword = async (oldPassword, newPassword) => {
 // --- Fungsi Umum untuk Panggilan API dengan JWT Authentication ---
 const fetchData = async (url, options = {}) => {
   try {
-    // Get JWT token from localStorage
-    const token = localStorage.getItem('token');
-    
-    // Add Authorization header if token exists
+    // ✅ Token sekarang dikirim otomatis via HTTP-only cookie
     const headers = {
       ...options.headers,
     };
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
     
     // Only add Content-Type if not sending FormData
     if (options.body && !(options.body instanceof FormData)) {
@@ -62,7 +54,8 @@ const fetchData = async (url, options = {}) => {
     
     const response = await fetch(url, {
       ...options,
-      headers
+      headers,
+      credentials: 'include' // ✅ Penting! Kirim HTTP-only cookies
     });
     
     // Handle 401 Unauthorized - token expired or invalid
@@ -72,8 +65,9 @@ const fetchData = async (url, options = {}) => {
       const last = window.__lastAuthRedirect || 0;
       if (now - last > 5000) {
         window.__lastAuthRedirect = now;
-        localStorage.removeItem('token');
+        // Clear user info (token ada di HTTP-only cookie)
         localStorage.removeItem('user');
+        localStorage.removeItem('isSuperAdmin');
         window.location.replace('/login');
       }
       throw new Error('Session expired');

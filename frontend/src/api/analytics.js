@@ -3,14 +3,17 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:500
 
 // Helper to add JWT token to requests
 const fetchWithAuth = async (url, options = {}) => {
-    const token = localStorage.getItem('token');
+    // ✅ Token sekarang dikirim otomatis via HTTP-only cookie
     const headers = {
         'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
         ...options.headers
     };
     
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { 
+        ...options, 
+        headers,
+        credentials: 'include' // ✅ Penting! Kirim HTTP-only cookies
+    });
     
     if (response.status === 401) {
         // Prevent redirect storm: only redirect once per 5s window
@@ -18,8 +21,9 @@ const fetchWithAuth = async (url, options = {}) => {
         const last = window.__lastAuthRedirect || 0;
         if (now - last > 5000) {
             window.__lastAuthRedirect = now;
-            localStorage.removeItem('token');
+            // Clear user info (token ada di HTTP-only cookie)
             localStorage.removeItem('user');
+            localStorage.removeItem('isSuperAdmin');
             window.location.replace('/login');
         }
         throw new Error('Session expired');

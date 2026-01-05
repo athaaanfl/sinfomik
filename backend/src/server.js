@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser'); // For parsing HTTP-only cookies
 const { getDb } = require('./config/db'); // Import PostgreSQL adapter
 const initializeDatabasePostgres = require('./init_db_postgres_simple'); // Import database initialization (simplified, idempotent)
 const { expensiveQueueMiddleware, moderateQueueMiddleware, lightQueueMiddleware, getQueueStats } = require('./middlewares/requestQueueMiddleware');
@@ -41,26 +42,19 @@ app.use(helmet({
 
 // 2. CORS - Configure properly untuk specific origin
 // In production, if frontend is served from same domain, allow same origin
-// In development, allow localhost:3000 and local network IPs
+// In development, allow localhost:3000
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production' 
         ? [FRONTEND_URL, 'https://*.azurewebsites.net', 'https://*.azurestaticapps.net', 'https://sinfomik-backend-gzcng8eucydhgucz.southeastasia-01.azurewebsites.net', 'https://salmon-glacier-082ece600.3.azurestaticapps.net'] // Allow Azure domains
-        : function (origin, callback) {
-            // Allow requests with no origin (like mobile apps or curl)
-            if (!origin) return callback(null, true);
-            
-            // Allow localhost and local network IPs (192.168.x.x, 10.x.x.x)
-            if (origin.match(/^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/)) {
-                callback(null, true);
-            } else {
-                callback(new Error('Not allowed by CORS'));
-            }
-        },
+        : ['http://localhost:3000', 'http://localhost:3001'], // Development
     credentials: true,
     exposedHeaders: ['Content-Disposition']
 };
 
 app.use(cors(corsOptions));
+
+// Cookie parser untuk HTTP-only cookies
+app.use(cookieParser());
 
 // 3. Rate Limiting - Prevent brute force attacks
 // IMPROVED: Much stricter limits to prevent DDoS

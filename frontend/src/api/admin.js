@@ -4,14 +4,17 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:500
 // --- Fungsi Umum untuk Panggilan API dengan JWT ---
 const fetchData = async (url, options = {}) => {
   try {
-    const token = localStorage.getItem('token');
+    // ✅ Token sekarang dikirim otomatis via HTTP-only cookie
     const headers = {
       'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers
     };
     
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { 
+      ...options, 
+      headers,
+      credentials: 'include' // ✅ Penting! Kirim HTTP-only cookies
+    });
     
     // Handle 401 Unauthorized with redirect guard
     if (response.status === 401) {
@@ -23,13 +26,13 @@ const fetchData = async (url, options = {}) => {
         // Try to get response body for detailed error info
         const errorData = await response.json().catch(() => ({}));
         
-        // Clear session data
-        localStorage.removeItem('token');
+        // Clear session data (user info only, token ada di HTTP-only cookie)
         localStorage.removeItem('user');
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('userRole');
         localStorage.removeItem('username');
         localStorage.removeItem('userId');
+        localStorage.removeItem('isSuperAdmin');
         
         // Handle session invalidation from other device
         if (errorData.sessionInvalidated) {
