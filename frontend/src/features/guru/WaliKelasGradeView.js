@@ -127,9 +127,7 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
     try {
       const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
       const response = await fetch(`${API_BASE_URL}/api/analytics/timeseries/student/${studentId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        credentials: 'include' // ✅ Send HTTP-only cookie
       });
       const result = await response.json();
       
@@ -156,9 +154,7 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
       const response = await fetch(
         `${API_BASE_URL}/api/analytics/timeseries/early-warning/class/${selectedClass}?tahun_ajaran=${activeTASemester.tahun_ajaran}&semester=${activeTASemester.semester}`,
         {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+          credentials: 'include' // ✅ Send HTTP-only cookie
         }
       );
       const result = await response.json();

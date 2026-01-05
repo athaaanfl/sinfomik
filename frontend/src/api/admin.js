@@ -352,12 +352,9 @@ export const promoteStudents = async (student_ids, target_kelas_id, target_ta_se
 // --- API untuk Import/Export Siswa ---
 export const downloadStudentTemplate = async () => {
   try {
-    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE_URL}/api/excel/students/template`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      credentials: 'include' // ✅ Send HTTP-only cookie
     });
 
     if (!response.ok) {
@@ -383,15 +380,12 @@ export const downloadStudentTemplate = async () => {
 
 export const importStudents = async (file) => {
   try {
-    const token = localStorage.getItem('token');
     const formData = new FormData();
     formData.append('file', file);
 
     const response = await fetch(`${API_BASE_URL}/api/excel/students/import`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
+      credentials: 'include', // ✅ Send HTTP-only cookie
       body: formData
     });
 
@@ -411,12 +405,9 @@ export const importStudents = async (file) => {
 // --- API untuk Excel Import Enrollment ---
 export const downloadEnrollmentTemplate = async () => {
   try {
-    const token = localStorage.getItem('token');
     const response = await fetch(`${API_BASE_URL}/api/excel/enrollment/template`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      credentials: 'include' // ✅ Send HTTP-only cookie
     });
 
     if (!response.ok) {
@@ -440,14 +431,13 @@ export const downloadEnrollmentTemplate = async () => {
 
 export const importEnrollment = async (file) => {
   try {
-    const token = localStorage.getItem('token');
     const formData = new FormData();
     formData.append('file', file);
 
     const response = await fetch(`${API_BASE_URL}/api/excel/enrollment/import`, {
       method: 'POST',
+      credentials: 'include', // ✅ Send HTTP-only cookie
       headers: {
-        'Authorization': `Bearer ${token}`
       },
       body: formData
     });

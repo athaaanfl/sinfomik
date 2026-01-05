@@ -34,11 +34,10 @@ const AtpViewerModal = ({ id_mapel, fase, nama_mapel, onClose }) => {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await fetch(`${API_BASE_URL}/api/excel/atp/${id_mapel}/${fase}`, {
+        credentials: 'include', // ✅ Send HTTP-only cookie
         headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
         }
       });
       
@@ -78,13 +77,11 @@ const AtpViewerModal = ({ id_mapel, fase, nama_mapel, onClose }) => {
     setSaving(true);
     setSaveMessage('');
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await fetch(`${API_BASE_URL}/api/excel/atp/${id_mapel}/${fase}`, {
         method: 'PUT',
+        credentials: 'include', // ✅ Send HTTP-only cookie
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify({ data: editedData })
       });
@@ -548,13 +545,9 @@ const ImportExcel = ({ onImportSuccess }) => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await fetch(`${API_BASE_URL}/api/excel/import-cp`, {
         method: 'POST',
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
+        credentials: 'include', // ✅ Send HTTP-only cookie
         body: formData,
       });
       

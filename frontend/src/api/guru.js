@@ -203,16 +203,9 @@ export const exportGradeTemplate = async (id_guru, id_mapel, id_kelas, id_ta_sem
   }
   
   try {
-    // Get JWT token from localStorage
-    const token = localStorage.getItem('token');
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
     const response = await fetch(
       `${API_BASE_URL}/api/grades/export-template/${id_guru}/${id_mapel}/${id_kelas}/${id_ta_semester}`,
-      { headers }
+      { credentials: 'include' } // ✅ Send HTTP-only cookie
     );
     
     // Handle 401 Unauthorized with redirect guard
@@ -328,16 +321,9 @@ export const exportFinalGrades = async (id_guru, id_mapel, id_kelas, id_ta_semes
   }
   
   try {
-    // Get JWT token from localStorage
-    const token = localStorage.getItem('token');
-    const headers = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
     const response = await fetch(
       `${API_BASE_URL}/api/grades/export/${id_guru}/${id_mapel}/${id_kelas}/${id_ta_semester}`,
-      { headers }
+      { credentials: 'include' } // ✅ Send HTTP-only cookie
     );
     
     // Handle 401 Unauthorized with redirect guard

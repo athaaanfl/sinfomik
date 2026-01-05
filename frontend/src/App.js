@@ -16,6 +16,13 @@
 
       // Efek untuk memeriksa status login dari localStorage (jika ada)
       useEffect(() => {
+        // 🧹 Clean up old token from localStorage (legacy code cleanup)
+        // Token sekarang disimpan sebagai HTTP-only cookie, bukan di localStorage
+        if (localStorage.getItem('token')) {
+          console.log('🧹 Removing legacy token from localStorage');
+          localStorage.removeItem('token');
+        }
+        
         const storedLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
         const storedUserRole = localStorage.getItem('userRole');
         const storedUsername = localStorage.getItem('username');
