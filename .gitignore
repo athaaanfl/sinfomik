@@ -1,0 +1,85 @@
+# Node modules
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+backend/.env
+frontend/.env
+frontend/.env.production
+
+# Build directories
+backend/build/
+frontend/build/
+frontend/dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Package manager lock files (optional - comment out if you want to track them)
+# package-lock.json
+# yarn.lock
+
+# Coverage directories
+coverage/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+backend/academic_dashboard.db
+backend/academic_dashboard_backup*.db
+backend/database.db
+backend/uploads/
+
+# Deployment files
+.deployment
+coverage/
+.nyc_output/
+
+# Uploads directory (optional - uncomment if you don't want to track uploads)
+# backend/uploads/
+
+# SQLite database (keep .example if exists)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+!*.db.example
+
+# Project-specific ignores
+backend/academic_dashboard.db
+
+# UAT Documentation (contains test credentials)
+UAT_*.md
+UAT_*.txt
+
+# Temporary check scripts
+backend/src/check_*.js

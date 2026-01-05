@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tes Recharts</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Tes Recharts - BUDAYA JABAR</h1>
+        <div id="root"></div>
+    </div>
+
+    <script type="text/babel">
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
+
+        // Data yang sama dengan siswa 1001 - BUDAYA JABAR
+        const testData = [
+            {
+                period: "2023/2024 Ganjil",
+                tahun_ajaran: "2023/2024",
+                semester: "Ganjil",
+                nilai: 83.66
+            },
+            {
+                period: "2023/2024 Genap",
+                tahun_ajaran: "2023/2024",
+                semester: "Genap",
+                nilai: 85.75
+            },
+            {
+                period: "2024/2025 Ganjil",
+                tahun_ajaran: "2024/2025",
+                semester: "Ganjil",
+                nilai: 84.32
+            }
+        ];
+
+        function TestChart() {
+            return (
+                <div>
+                    <p style={{marginBottom: '20px', padding: '10px', background: '#e3f2fd', borderRadius: '4px'}}>
+                        ✅ Data tersedia: {testData.length} periode
+                    </p>
+                    <ResponsiveContainer width="100%" height={400}>
+                        <LineChart data={testData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                                dataKey="period" 
+                                angle={-45} 
+                                textAnchor="end" 
+                                height={100}
+                            />
+                            <YAxis domain={[0, 100]} />
+                            <Tooltip />
+                            <Legend />
+                            <Line
+                                type="monotone"
+                                dataKey="nilai"
+                                stroke="#8b5cf6"
+                                strokeWidth={3}
+                                dot={{ r: 6 }}
+                                name="BUDAYA JABAR"
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                    <div style={{marginTop: '20px', padding: '10px', background: '#f5f5f5', borderRadius: '4px'}}>
+                        <pre>{JSON.stringify(testData, null, 2)}</pre>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<TestChart />, document.getElementById('root'));
+    </script>
+</body>
+</html>

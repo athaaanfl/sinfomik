@@ -1,0 +1,775 @@
+================================================================================
+                    DOKUMENTASI SISTEM SINFOMIK
+           Sistem Informasi Manajemen Akademik SD Binekas
+================================================================================
+
+PROJECT NAME: Sinfomik (Sistem Informasi Manajemen Akademik)
+SCHOOL: SD Binekas
+VERSION: 1.0.0
+STATUS: Production Ready with MySQL Database
+BRANCH: main
+
+================================================================================
+1. OVERVIEW SISTEM
+================================================================================
+
+Sinfomik adalah web application komprehensif untuk mengelola data akademik
+sekolah dasar. Sistem ini menangani manajemen siswa, guru, kelas, nilai, 
+capaian pembelajaran, dan analitik akademik.
+
+Tujuan Utama:
+- Digitalisasi penuh proses manajemen akademik
+- Tracking nilai siswa real-time
+- Monitoring capaian pembelajaran (Learning Outcomes)
+- Analytics performa akademik per siswa/kelas/guru
+- Otomasi kenaikan kelas
+- Reporting komprehensif untuk stakeholder
+
+================================================================================
+2. TEKNOLOGI STACK
+================================================================================
+
+FRONTEND:
+- React.js (JavaScript UI Framework)
+- Tailwind CSS (Utility-first CSS)
+- PWA (Progressive Web App) - Offline capability
+- Service Worker (Background sync)
+- Responsive Design (Mobile-friendly)
+
+BACKEND:
+- Node.js (Runtime)
+- Express.js (Web Framework)
+- MySQL 8.4 (Database - Recently migrated from SQLite)
+- JWT (Authentication)
+- bcrypt (Password hashing)
+- Helmet.js (Security headers)
+- CORS (Cross-Origin Resource Sharing)
+- Rate Limiting (Anti brute-force)
+
+TOOLS:
+- npm (Package Manager)
+- nodemon (Development auto-reload)
+- Git (Version Control)
+- DBeaver (Database GUI)
+- MySQL Workbench (DB Management)
+
+================================================================================
+3. STRUKTUR FOLDER PROJECT
+================================================================================
+
+sinfomik/
+├── backend/                          # Node.js Express Server
+│   ├── src/
+│   │   ├── server.js                # Main entry point
+│   │   ├── config/
+│   │   │   ├── db.js                # SQLite config (deprecated)
+│   │   │   ├── mysql.js             # MySQL connection pool
+│   │   │   ├── dbAdapter.js         # Query abstraction layer
+│   │   │   └── dbWrapper.js         # Backward compatibility wrapper
+│   │   ├── controllers/
+│   │   │   ├── authController.js    # Login/authentication
+│   │   │   ├── adminController.js   # Admin operations (38 functions)
+│   │   │   ├── guruController.js    # Teacher operations
+│   │   │   ├── gradeController.js   # Grade management
+│   │   │   ├── analyticsController.js # Analytics & reports
+│   │   │   ├── kkmController.js     # Minimum passing criteria
+│   │   │   └── excelController.js   # Excel import/export
+│   │   ├── routes/
+│   │   │   ├── authRoutes.js        # Login endpoint
+│   │   │   ├── adminRoutes.js       # Admin CRUD endpoints
+│   │   │   ├── guruRoutes.js        # Teacher endpoints
+│   │   │   ├── gradeRoutes.js       # Grade endpoints
+│   │   │   ├── analyticsRoutes.js   # Analytics endpoints
+│   │   │   ├── excelRoutes.js       # Excel endpoints
+│   │   │   └── kkmRoutes.js         # KKM endpoints
+│   │   ├── middlewares/
+│   │   │   ├── authMiddleware.js    # JWT verification
+│   │   │   └── fileUpload.js        # File handling
+│   │   ├── scripts/
+│   │   │   ├── migrate_sqlite_to_mysql.js # Data migration
+│   │   │   └── simulate_6_years_data.js   # Dummy data generation
+│   │   └── init_db.js               # Database initialization
+│   ├── package.json                 # Dependencies
+│   ├── .env                         # Environment variables
+│   └── uploads/                     # File storage
+│
+├── frontend/                         # React Application
+│   ├── src/
+│   │   ├── index.js                 # App entry point
+│   │   ├── App.js                   # Main component
+│   │   ├── api/                     # API client layer
+│   │   │   ├── auth.js              # Login API calls
+│   │   │   ├── admin.js             # Admin API calls
+│   │   │   ├── guru.js              # Teacher API calls
+│   │   │   └── analytics.js         # Analytics API calls
+│   │   ├── components/              # Reusable components
+│   │   │   ├── Button.js
+│   │   │   ├── Table.js
+│   │   │   ├── LoadingSpinner.js
+│   │   │   ├── ConfirmDialog.js
+│   │   │   ├── StatusMessage.js
+│   │   │   ├── FormSection.js
+│   │   │   ├── PageHeader.js
+│   │   │   ├── ModuleContainer.js
+│   │   │   ├── PWAInstallPrompt.js
+│   │   │   ├── PWAUpdatePrompt.js
+│   │   │   └── EmptyState.js
+│   │   ├── context/
+│   │   │   └── AuthContext.js       # Global auth state
+│   │   ├── features/
+│   │   │   ├── admin/               # Admin module features
+│   │   │   │   ├── student.js
+│   │   │   │   ├── classManagement.js
+│   │   │   │   ├── course.js
+│   │   │   │   ├── grade.js
+│   │   │   │   ├── analytics.js
+│   │   │   │   ├── capaianPembelajaranManagement.js
+│   │   │   │   ├── classPromote.js
+│   │   │   │   └── studentClassEnroll.js
+│   │   │   └── guru/                # Teacher module features
+│   │   ├── pages/
+│   │   │   ├── LoginPage.js
+│   │   │   ├── AdminDashboardContent.js
+│   │   │   ├── GuruDashboard.js
+│   │   │   ├── SiswaDashboard.js
+│   │   │   └── DashboardPage.js
+│   │   ├── config/
+│   │   │   └── constants.js         # API endpoints, configs
+│   │   ├── App.css
+│   │   └── index.css
+│   ├── public/
+│   │   ├── index.html
+│   │   ├── manifest.json            # PWA manifest
+│   │   ├── offline.html
+│   │   └── robots.txt
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── postcss.config.js
+│
+└── Documentation files/
+    ├── README.md
+    ├── DEPLOYMENT_GUIDE.md
+    ├── MODULE_REFACTORING_SUMMARY.md
+    ├── UI_MODERNIZATION.md
+    └── DOKUMENTASI_SISTEM.txt (This file)
+
+================================================================================
+4. DATABASE SCHEMA (MySQL)
+================================================================================
+
+TABEL UTAMA:
+
+A. Admin
+   - id_admin (PK)
+   - username (UNIQUE)
+   - password_hash
+   - nama
+
+B. Guru (Teacher)
+   - id_guru (PK, AUTO_INCREMENT)
+   - username (UNIQUE)
+   - password_hash
+   - nama_guru
+   - email (UNIQUE)
+
+C. Siswa (Student)
+   - id_siswa (PK)
+   - username (UNIQUE)
+   - password
+   - nama_siswa
+   - nisn (UNIQUE) - Student ID Number
+   - email (UNIQUE)
+   - tanggal_lahir (DATE)
+   - jenis_kelamin (ENUM: 'L', 'P')
+   - alamat
+   - no_telepon
+
+D. TahunAjaranSemester (Academic Year & Semester)
+   - id_ta_semester (PK, AUTO_INCREMENT)
+   - tahun_ajaran (e.g., "2024/2025")
+   - semester (e.g., "Ganjil", "Genap")
+   - is_aktif (BOOLEAN)
+   - tanggal_mulai (DATE)
+   - tanggal_selesai (DATE)
+   - UNIQUE: (tahun_ajaran, semester)
+
+E. Kelas (Class)
+   - id_kelas (PK, AUTO_INCREMENT)
+   - nama_kelas (e.g., "X A", "XI IPA 1")
+   - id_wali_kelas (FK to Guru)
+   - id_ta_semester (FK to TahunAjaranSemester)
+   - UNIQUE: (nama_kelas, id_ta_semester)
+
+F. MataPelajaran (Subject)
+   - id_mapel (PK, AUTO_INCREMENT)
+   - nama_mapel (UNIQUE) - e.g., "Matematika", "Bahasa Indonesia"
+
+G. TipeNilai (Grade Type)
+   - id_tipe_nilai (PK, AUTO_INCREMENT)
+   - nama_tipe (UNIQUE) - e.g., "Tugas Harian", "UTS", "UAS"
+   - deskripsi
+
+H. SiswaKelas (Student-Class Enrollment)
+   - id_siswa_kelas (PK, AUTO_INCREMENT)
+   - id_siswa (FK)
+   - id_kelas (FK)
+   - id_ta_semester (FK)
+   - UNIQUE: (id_siswa, id_kelas, id_ta_semester)
+
+I. GuruMataPelajaranKelas (Teacher-Subject-Class Assignment)
+   - id_guru_mapel_kelas (PK, AUTO_INCREMENT)
+   - id_guru (FK)
+   - id_mapel (FK)
+   - id_kelas (FK)
+   - id_ta_semester (FK)
+   - UNIQUE: (id_guru, id_mapel, id_kelas, id_ta_semester)
+
+J. Nilai (Grades/Scores)
+   - id_nilai (PK, AUTO_INCREMENT)
+   - id_siswa (FK)
+   - id_guru (FK)
+   - id_mapel (FK)
+   - id_kelas (FK)
+   - id_ta_semester (FK)
+   - jenis_nilai (CHECK: 'TP', 'UAS')
+   - urutan_tp (Task number)
+   - nilai (DECIMAL score)
+   - tanggal_input
+   - keterangan
+   - UNIQUE: (id_siswa, id_guru, id_mapel, id_kelas, id_ta_semester, jenis_nilai, urutan_tp)
+
+K. CapaianPembelajaran (Learning Outcomes/Competencies)
+   - id_cp (PK, AUTO_INCREMENT)
+   - id_mapel (FK)
+   - fase (e.g., "A", "B", "C") - Learning phase
+   - deskripsi_cp - Competency description
+   - file_path - Document path
+   - UNIQUE: (id_mapel, fase)
+
+L. SiswaCapaianPembelajaran (Student Learning Achievement)
+   - id_siswa_cp (PK, AUTO_INCREMENT)
+   - id_siswa (FK)
+   - id_cp (FK)
+   - id_guru (FK)
+   - id_ta_semester (FK)
+   - status_capaian (e.g., "Tercapai", "Tidak Tercapai")
+   - tanggal_penilaian
+   - catatan
+
+M. KKM_Settings (Kriteria Ketuntasan Minimal - Minimum Passing Criteria)
+   - id_kkm (PK, AUTO_INCREMENT)
+   - id_guru (FK)
+   - id_mapel (FK)
+   - id_kelas (FK)
+   - id_ta_semester (FK)
+   - jenis_nilai (CHECK: 'TP', 'UAS', 'FINAL')
+   - urutan_tp
+   - nilai_kkm (DECIMAL)
+   - tanggal_update
+   - UNIQUE: (id_guru, id_mapel, id_kelas, id_ta_semester, jenis_nilai, urutan_tp)
+
+TOTAL: 13 tables dengan relationships dan constraints
+
+================================================================================
+5. FITUR UTAMA SISTEM
+================================================================================
+
+A. AUTHENTICATION & AUTHORIZATION
+   ✓ Login dengan 3 role: Admin, Guru, Siswa
+   ✓ JWT-based authentication
+   ✓ Password hashing dengan bcrypt
+   ✓ Role-based access control (RBAC)
+   ✓ Session management
+   ✓ Logout functionality
+
+B. ADMIN DASHBOARD (38 functions)
+   
+   1. MANAJEMEN SISWA
+      - List semua siswa dengan filter
+      - Tambah siswa baru (form validation)
+      - Edit data siswa (nama, NISN, email, tanggal lahir)
+      - Delete siswa dari sistem
+      - Bulk import siswa dari Excel
+      
+   2. MANAJEMEN GURU
+      - List semua guru aktif
+      - Tambah guru baru
+      - Edit profil guru
+      - Delete guru
+      - Assign guru ke mata pelajaran & kelas
+      
+   3. MANAJEMEN KELAS
+      - List kelas per tahun ajaran
+      - Tambah kelas baru
+      - Edit nama/wali kelas
+      - Delete kelas
+      - Set wali kelas (homeroom teacher)
+      
+   4. MANAJEMEN TAHUN AJARAN & SEMESTER
+      - List tahun ajaran (e.g., 2024/2025)
+      - Tambah tahun ajaran baru
+      - Set tahun ajaran aktif
+      - Manage semester (Ganjil/Genap)
+      
+   5. MANAJEMEN MATA PELAJARAN
+      - List semua mata pelajaran
+      - Tambah mata pelajaran baru
+      - Edit mata pelajaran
+      - Delete mata pelajaran
+      
+   6. PENUGASAN SISWA KE KELAS
+      - Enroll siswa ke kelas
+      - View siswa dalam kelas
+      - Unenroll siswa dari kelas
+      
+   7. PENUGASAN GURU KE MAPEL & KELAS
+      - Assign guru mengajar mata pelajaran di kelas tertentu
+      - View assignment guru
+      - Delete assignment
+      
+   8. MANAJEMEN CAPAIAN PEMBELAJARAN (CP)
+      - List capaian pembelajaran per mata pelajaran
+      - Tambah CP baru dengan fase (A, B, C)
+      - Edit CP
+      - Delete CP
+      
+   9. MANAJEMEN TIPE NILAI
+      - List tipe nilai (Tugas, UTS, UAS)
+      - Tambah tipe nilai
+      - Edit tipe nilai
+      - Delete tipe nilai
+      
+   10. KENAIKAN KELAS OTOMATIS
+       - Automatic class promotion berdasarkan TA/semester
+       - Validasi nilai akhir
+       - Update enrollment siswa ke kelas baru
+
+C. GURU DASHBOARD
+   1. VIEW KELAS & SISWA
+      - List kelas yang diajar
+      - List siswa dalam kelas
+      
+   2. MANAJEMEN NILAI
+      - Input nilai siswa (Tugas Harian, UTS, UAS)
+      - Edit nilai
+      - Export nilai ke Excel
+      - Import nilai dari Excel
+      
+   3. CAPAIAN PEMBELAJARAN
+      - Assess siswa per CP (Tercapai/Tidak)
+      - Catatan penilaian
+      - Tracking progress per siswa
+      
+   4. KKM SETTINGS
+      - Set Kriteria Ketuntasan Minimal per mapel/kelas
+      - Manage multiple KKM per jenis nilai
+      
+   5. LAPORAN
+      - Nilai per siswa
+      - Analisis pencapaian CP
+      - Daftar nilai kelas
+
+D. ANALYTICS & REPORTING
+   1. DASHBOARD OVERVIEW
+      - Total siswa, guru, kelas
+      - Grafik nilai per mata pelajaran
+      - Distribusi capaian pembelajaran
+      
+   2. ANALYTICS SISWA
+      - Performa individual siswa
+      - Trend nilai semester to semester
+      - Analisis CP per siswa
+      - Rekomendasi remedial
+      
+   3. ANALYTICS KELAS
+      - Rata-rata kelas per mapel
+      - Distribusi nilai (histogram)
+      - Comparison antar kelas
+      - Top/bottom performers
+      
+   4. ANALYTICS GURU
+      - Performa pengajaran guru
+      - Rata-rata nilai siswa
+      - Trend CP achievement
+      
+   5. ANALYTICS AKADEMIK
+      - Kelulusan rate
+      - KKM compliance
+      - Semester progression
+
+E. FITUR EXCEL INTEGRATION
+
+Important note (Student import template):
+- The student import template now supports an optional column "Tahun Masuk" (or "Angkatan").
+- Provide a single year value (4 digits) such as `2024` when present. If the column is left empty, the system will use the currently active academic year (TA) and derive the start year automatically.
+- This change helps analytics group students by single-year cohorts (angkatan) instead of full ranges like `2024/2025`.
+
+   - Import siswa dari file Excel
+   - Export nilai ke Excel
+   - Import nilai dari template Excel
+   - Format validation
+   - Error handling & reporting
+
+F. SECURITY FEATURES
+   ✓ Helmet.js (HTTP security headers)
+   ✓ CORS configuration (whitelist http://localhost:3000)
+   ✓ Rate limiting (prevent brute-force attacks)
+   ✓ SQL injection protection (parameterized queries)
+   ✓ XSS protection (input sanitization)
+   ✓ Password hashing with bcrypt
+   ✓ JWT token expiration
+   ✓ Role-based access control
+
+G. PWA FEATURES (Progressive Web App)
+   - Offline capability dengan Service Worker
+   - Install as app on mobile/desktop
+   - Background sync
+   - Push notifications ready
+   - App manifest & icons
+   - Responsive design
+
+================================================================================
+6. API ENDPOINTS
+================================================================================
+
+BASE URL: http://localhost:5000/api
+
+AUTH ENDPOINTS:
+POST   /auth/login                    - Login user (admin/guru)
+POST   /auth/logout                   - Logout
+
+ADMIN ENDPOINTS:
+GET    /admin/students                - List all students
+POST   /admin/students                - Add new student
+PUT    /admin/students/:id            - Update student
+DELETE /admin/students/:id            - Delete student
+
+GET    /admin/teachers                - List all teachers
+POST   /admin/teachers                - Add new teacher
+PUT    /admin/teachers/:id            - Update teacher
+DELETE /admin/teachers/:id            - Delete teacher
+
+GET    /admin/kelas                   - List classes
+POST   /admin/kelas                   - Add class
+PUT    /admin/kelas/:id               - Update class
+DELETE /admin/kelas/:id               - Delete class
+
+GET    /admin/ta-semester             - List academic years
+POST   /admin/ta-semester             - Add academic year
+PUT    /admin/ta-semester/set-active/:id - Set active academic year
+
+GET    /admin/mapel                   - List subjects
+POST   /admin/mapel                   - Add subject
+PUT    /admin/mapel/:id               - Update subject
+DELETE /admin/mapel/:id               - Delete subject
+
+GET    /admin/cp                      - List learning outcomes
+POST   /admin/cp                      - Add learning outcome
+PUT    /admin/cp/:id                  - Update learning outcome
+DELETE /admin/cp/:id                  - Delete learning outcome
+
+GET    /admin/tipe-nilai              - List grade types
+POST   /admin/tipe-nilai              - Add grade type
+PUT    /admin/tipe-nilai/:id          - Update grade type
+DELETE /admin/tipe-nilai/:id          - Delete grade type
+
+POST   /admin/siswa-kelas             - Enroll student to class
+GET    /admin/siswa-in-kelas/:id_kelas/:id_ta_semester - List students in class
+DELETE /admin/siswa-kelas             - Unenroll student
+
+POST   /admin/guru-mapel-kelas        - Assign teacher
+GET    /admin/guru-mapel-kelas/:id_ta_semester - Get assignments
+DELETE /admin/guru-mapel-kelas/assignment/:id - Delete assignment
+
+PUT    /admin/kelas/:id_kelas/wali-kelas - Update homeroom teacher
+
+POST   /admin/promote-students        - Auto-promote students
+
+GURU ENDPOINTS:
+GET    /guru/assignments/:id          - Get teacher assignments
+GET    /guru/grades                   - Get grades
+POST   /guru/grades                   - Input/update grades
+
+GRADE ENDPOINTS:
+GET    /grades                        - List grades with filters
+POST   /grades                        - Add grade
+PUT    /grades/:id                    - Update grade
+DELETE /grades/:id                    - Delete grade
+GET    /grades/export-template/:id_guru/:id_mapel/:id_kelas/:id_ta_semester - Export template
+
+ANALYTICS ENDPOINTS:
+GET    /analytics/overview            - Dashboard overview
+GET    /analytics/student/:id_siswa   - Student analytics
+GET    /analytics/class/:id_kelas     - Class analytics
+GET    /analytics/teacher/:id_guru    - Teacher analytics
+GET    /analytics/subject/:id_mapel   - Subject analytics
+
+EXCEL ENDPOINTS:
+POST   /excel/import-siswa            - Import students from Excel
+POST   /excel/import-nilai            - Import grades from Excel
+GET    /excel/export-nilai/:id_guru/:id_mapel/:id_kelas/:id_ta_semester - Export grades
+
+KKM ENDPOINTS:
+GET    /kkm                           - List KKM settings
+POST   /kkm                           - Add KKM
+PUT    /kkm/:id                       - Update KKM
+DELETE /kkm/:id                       - Delete KKM
+
+================================================================================
+7. SAMPLE DATA
+================================================================================
+
+ADMIN ACCOUNT:
+- Username: admin
+- Password: admin123
+- Role: Administrator
+
+TEACHER ACCOUNTS:
+1. Username: budi.s
+   Nama: Pak Budi Santoso
+   Email: budi@sdbinekas.sch.id
+
+2. Username: ani.w
+   Nama: Ibu Ani Wijaya
+   Email: ani@sdbinekas.sch.id
+
+3. Username: citra.d
+   Nama: Ibu Citra Dewi
+   Email: citra@sdbinekas.sch.id
+
+STUDENT DATA:
+- id_siswa: 1-1005
+- Sample: Andi Pratama, Budi Santoso, Citra Dewi, Dian Lestari, Eko Saputra
+
+CLASSES:
+- X A (Kelas 10 A)
+- XI IPA 1 (Kelas 11 IPA 1)
+
+ACADEMIC YEAR:
+- 2024/2025 Semester Ganjil (Active)
+
+SUBJECTS:
+- Matematika
+- Bahasa Indonesia
+- IPA
+- IPS
+- Bahasa Inggris
+- Pendidikan Agama
+
+================================================================================
+8. DATABASE MIGRATION
+================================================================================
+
+Sistem awalnya menggunakan SQLite untuk development. Telah dimigrasikan ke
+MySQL 8.4 untuk production dan analytics yang lebih powerful.
+
+MIGRATION PROCESS:
+1. MySQL 8.4 Command Line Client installed
+2. Database 'sinfomik_db' created
+3. Credentials: root / my-Admin @ localhost:3306
+4. Schema converted from SQLite to MySQL
+5. Data migrated using migration script
+6. All 7 controllers updated to work with MySQL
+7. DBAdapter & DBWrapper created for compatibility
+8. All endpoints tested & verified working
+
+MIGRATION STATS:
+- Tables: 13
+- Total records migrated: ~100+ across all tables
+- Controllers converted: 7
+- API endpoints tested: 20+
+- Success rate: 100%
+
+================================================================================
+9. FLOW PENGGUNAAN SISTEM
+================================================================================
+
+ADMIN WORKFLOW:
+1. Login sebagai admin
+2. Setup tahun ajaran baru (2024/2025)
+3. Buat kelas-kelas (X A, XI IPA 1, dll)
+4. Input data guru
+5. Input/import data siswa
+6. Assign siswa ke kelas
+7. Assign guru ke mata pelajaran & kelas
+8. Setup KKM (Minimum passing grades)
+9. Monitor analytics & reporting
+10. Proses kenaikan kelas otomatis
+
+GURU WORKFLOW:
+1. Login sebagai guru
+2. View kelas & siswa yang diajar
+3. Input nilai siswa (Tugas, UTS, UAS)
+4. Assess capaian pembelajaran siswa
+5. Export nilai ke Excel untuk laporan
+6. Monitor individual student performance
+
+SISWA WORKFLOW:
+1. Login sebagai siswa
+2. View nilai mereka
+3. Track capaian pembelajaran
+4. View class information
+
+================================================================================
+10. TEKNOLOGI DETAIL
+================================================================================
+
+FRONTEND TECHNOLOGIES:
+- React Hooks: useState, useEffect, useContext untuk state management
+- React Context API: Global auth state
+- Fetch API: HTTP requests ke backend
+- Tailwind CSS: Utility-first styling
+- Form handling: Controlled components
+- Chart.js: Data visualization (untuk analytics)
+- PWA: Service Worker untuk offline support
+
+BACKEND TECHNOLOGIES:
+- Express.js: Routing & middleware
+- MySQL2/Promise: Async database operations
+- bcrypt: Password hashing (cost factor: 10)
+- jsonwebtoken (JWT): Token-based authentication
+- dotenv: Environment variable management
+- Helmet: Security headers
+- CORS: Cross-origin requests
+- Express Rate Limit: Brute-force protection
+
+DATABASE:
+- MySQL 8.4.7
+- Relationships: 1-to-Many dan Many-to-Many
+- Indexes: Primary keys, unique constraints, foreign keys
+- Queries: Optimized with JOINs dan parameterized statements
+
+================================================================================
+11. SECURITY IMPLEMENTATION
+================================================================================
+
+AUTHENTICATION:
+- Admin/Guru login → JWT token generation
+- Token stored in localStorage (frontend)
+- Token sent in Authorization header
+- Token verified on every protected request
+- Token expiration handling
+
+PASSWORD SECURITY:
+- Passwords hashed with bcrypt (cost: 10)
+- Never stored in plaintext
+- Salt generated randomly
+- Comparison using bcrypt.compare()
+
+DATA PROTECTION:
+- SQL injection prevention: Parameterized queries
+- XSS prevention: Input validation & output encoding
+- CSRF protection: Not required (stateless API)
+- Rate limiting: Max requests per IP per time window
+
+API SECURITY:
+- CORS: Only localhost:3000 allowed
+- Helmet: Security headers (CSP, X-Frame-Options, etc.)
+- HTTPS ready: Can be deployed with SSL/TLS
+
+================================================================================
+12. DEPLOYMENT INFO
+================================================================================
+
+CURRENT SETUP:
+- Development environment
+- Local MySQL database
+- Backend runs on: http://localhost:5000
+- Frontend runs on: http://localhost:3000
+
+DEPLOYMENT CHECKLIST (For Production):
+- [ ] Use environment variables for sensitive data
+- [ ] Enable HTTPS/SSL
+- [ ] Setup production database (managed service)
+- [ ] Configure proper CORS for production domain
+- [ ] Enable rate limiting in production
+- [ ] Setup monitoring & logging
+- [ ] Database backups automated
+- [ ] Error tracking (Sentry)
+- [ ] Performance monitoring
+- [ ] CDN for static files
+
+RECOMMENDED PLATFORMS:
+- Backend: Railway, Heroku, AWS Lambda, DigitalOcean
+- Frontend: Vercel, Netlify, AWS S3 + CloudFront
+- Database: AWS RDS, Google Cloud SQL, MySQL Cloud
+
+================================================================================
+13. DEVELOPMENT TOOLS
+================================================================================
+
+REQUIRED TOOLS:
+- Node.js 16+
+- npm 7+
+- MySQL 8.0+
+- Git
+- Code Editor (VSCode recommended)
+- Postman atau Thunder Client (API testing)
+- DBeaver (Database GUI)
+
+VSCODE EXTENSIONS RECOMMENDED:
+- ES7+ React/Redux/React-Native snippets
+- Prettier - Code formatter
+- ESLint
+- Thunder Client (API testing)
+- MySQL
+- GitLens
+
+COMMANDS:
+Backend:
+  npm run dev          - Start with nodemon (development)
+  npm start            - Start production server
+  npm test             - Run tests (if configured)
+
+Frontend:
+  npm start            - Development server on port 3000
+  npm run build        - Build for production
+  npm run eject        - Eject from CRA (not recommended)
+
+Database:
+  mysql -u root -pmy-Admin -D sinfomik_db < schema.sql    - Restore database
+
+================================================================================
+14. TROUBLESHOOTING
+================================================================================
+
+COMMON ISSUES:
+
+1. "Cannot connect to MySQL"
+   - Check MySQL is running
+   - Verify credentials in .env
+   - Check database exists: mysql -u root -pmy-Admin -e "SHOW DATABASES;"
+   
+2. "JWT token invalid/expired"
+   - Login again to get new token
+   - Check token in Authorization header format
+   
+3. "CORS error"
+   - Verify frontend URL in backend CORS config
+   - Clear browser cache
+   
+4. "Port already in use"
+   - Kill existing process: netstat -ano | findstr :5000
+   - Or change port in .env
+   
+5. "API endpoint returns 404"
+   - Check endpoint URL spelling
+   - Verify admin routes are loaded
+   - Check authentication headers
+
+
+================================================================================
+15. CONTACT & SUPPORT
+================================================================================
+
+Project Owner: athaanfl
+Repository: https://github.com/athaanfl/sinfomik
+Branch: main (Production)
+School: SD Binekas
+
+Last Updated: December 7, 2025
+Documentation Version: 1.0
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

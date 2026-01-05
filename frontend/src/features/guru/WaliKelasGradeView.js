@@ -1,0 +1,1418 @@
+// frontend/src/features/guru/WaliKelasGradeView.js
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
+  LineChart, Line, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+} from 'recharts';
+import * as guruApi from '../../api/guru';
+import { fetchStudentAnalytics } from '../../api/analytics';
+import { ALLOWED_MAPEL_WALI, normalizeName } from '../../config/constants';
+import Button from '../../components/Button';
+import Table from '../../components/Table';
+import ModuleContainer from '../../components/ModuleContainer';
+import PageHeader from '../../components/PageHeader';
+import FormSection from '../../components/FormSection';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import StatusMessage from '../../components/StatusMessage';
+import EmptyState from '../../components/EmptyState';
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
+
+const WaliKelasGradeView = ({ activeTASemester, userId }) => {
+  const [activeView, setActiveView] = useState('overview');
+  const [gradesData, setGradesData] = useState(null);
+  const [classInfo, setClassInfo] = useState(null);
+  const [classList, setClassList] = useState([]);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentHistory, setStudentHistory] = useState(null);
+  // Radar display mode: 'current' (semester ini) or 'multi' (gabungan multi-semester)
+  const [radarMode, setRadarMode] = useState('current');
+  
+  // Time Series Analysis state
+  const [timeSeriesData, setTimeSeriesData] = useState(null);
+  const [timeSeriesLoading, setTimeSeriesLoading] = useState(false);
+  const [earlyWarningsData, setEarlyWarningsData] = useState(null);
+  const [earlyWarningsLoading, setEarlyWarningsLoading] = useState(false);
+  
+  const [processedData, setProcessedData] = useState({
+    gradesPerSubjectTable: new Map(),
+    summaryTableData: [],
+    uniqueTipeNilaiPerMapel: new Map(),
+    gradesByStudentChart: [],
+    gradesBySubjectChart: [],
+    gradeDistributionChart: [],
+  });
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
+
+  const fetchWaliKelasClassList = useCallback(async () => {
+    try {
+      if (!userId || !activeTASemester) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      const classes = await guruApi.getWaliKelasClassList(userId, activeTASemester.id_ta_semester);
+      setClassList(classes);
+      setLoading(false);
+      
+      if (classes.length === 0) {
+        // Guru bukan wali kelas - langsung stop loading
+        return;
+      }
+      
+      if (classes.length > 0 && !selectedClass) {
+        setSelectedClass(classes[0].id_kelas);
+      }
+    } catch (err) {
+      console.error('Error fetching wali kelas class list:', err);
+      setError('Gagal memuat data wali kelas. Silakan coba lagi.');
+      setClassList([]);
+      setLoading(false);
+    }
+  }, [userId, activeTASemester, selectedClass]);
+
+  const fetchWaliKelasGrades = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (!userId || !activeTASemester) {
+        setError("Informasi guru atau tahun ajaran aktif tidak tersedia.");
+        setLoading(false);
+        return;
+      }
+      const response = await guruApi.getWaliKelasGrades(userId, activeTASemester.id_ta_semester, selectedClass);
+      setGradesData(response.grades);
+      setClassInfo(response.classInfo);
+      processGradeData(response.grades);
+    } catch (err) {
+      setError(err.message);
+      setGradesData([]);
+      setClassInfo(null);
+      setProcessedData({
+        gradesPerSubjectTable: new Map(),
+        summaryTableData: [],
+        uniqueTipeNilaiPerMapel: new Map(),
+        gradesByStudentChart: [],
+        gradesBySubjectChart: [],
+        gradeDistributionChart: [],
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTASemester, userId, selectedClass]);
+
+  const fetchStudentHistory = useCallback(async (studentId) => {
+    try {
+      const result = await fetchStudentAnalytics(studentId, {});
+      setStudentHistory(result);
+    } catch (err) {
+      console.error('Error fetching student history:', err);
+      setStudentHistory(null);
+    }
+  }, []);
+
+  const handleStudentClick = (student) => {
+    setSelectedStudent(student);
+    setActiveView('studentDetail');
+    fetchStudentHistory(student.id_siswa);
+    fetchStudentTimeSeries(student.id_siswa);
+  };
+  
+  // Fetch Time Series Analysis for student
+  const fetchStudentTimeSeries = useCallback(async (studentId) => {
+    setTimeSeriesLoading(true);
+    try {
+      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE_URL}/api/analytics/timeseries/student/${studentId}`, {
+        credentials: 'include' // ✅ Send HTTP-only cookie
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        setTimeSeriesData(result);
+      } else {
+        setTimeSeriesData(null);
+      }
+    } catch (err) {
+      console.error('Error fetching time series:', err);
+      setTimeSeriesData(null);
+    } finally {
+      setTimeSeriesLoading(false);
+    }
+  }, []);
+  
+  // Fetch Early Warnings for class
+  const fetchEarlyWarnings = useCallback(async () => {
+    if (!selectedClass || !activeTASemester) return;
+    
+    setEarlyWarningsLoading(true);
+    try {
+      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+      const response = await fetch(
+        `${API_BASE_URL}/api/analytics/timeseries/early-warning/class/${selectedClass}?tahun_ajaran=${activeTASemester.tahun_ajaran}&semester=${activeTASemester.semester}`,
+        {
+          credentials: 'include' // ✅ Send HTTP-only cookie
+        }
+      );
+      const result = await response.json();
+      
+      if (result.success) {
+        setEarlyWarningsData(result);
+      } else {
+        setEarlyWarningsData(null);
+      }
+    } catch (err) {
+      console.error('Error fetching early warnings:', err);
+      setEarlyWarningsData(null);
+    } finally {
+      setEarlyWarningsLoading(false);
+    }
+  }, [selectedClass, activeTASemester]);
+
+  useEffect(() => {
+    fetchWaliKelasClassList();
+  }, [fetchWaliKelasClassList]);
+
+  useEffect(() => {
+    if (selectedClass) {
+      fetchWaliKelasGrades();
+      // Auto-load early warnings when class is selected
+      fetchEarlyWarnings();
+    }
+  }, [fetchWaliKelasGrades, selectedClass, fetchEarlyWarnings]);
+
+  const processGradeData = (grades) => {
+    const gradesPerSubjectTable = new Map();
+    const summaryStudentMap = new Map();
+    const subjectChartMap = new Map();
+    const uniqueTipeNilaiPerMapel = new Map();
+
+    grades.forEach(grade => {
+      if (!summaryStudentMap.has(grade.id_siswa)) {
+        summaryStudentMap.set(grade.id_siswa, {
+          id_siswa: grade.id_siswa,
+          nama_siswa: grade.nama_siswa,
+          overall_total: 0,
+          overall_count: 0,
+          subject_totals: new Map(),
+        });
+      }
+      
+      if (!grade.nama_mapel || !grade.jenis_nilai || grade.nilai === null) {
+        return;
+      }
+
+      if (!gradesPerSubjectTable.has(grade.nama_mapel)) {
+        gradesPerSubjectTable.set(grade.nama_mapel, new Map());
+      }
+      const studentsInSubjectMap = gradesPerSubjectTable.get(grade.nama_mapel);
+
+      if (!studentsInSubjectMap.has(grade.id_siswa)) {
+        studentsInSubjectMap.set(grade.id_siswa, {
+          id_siswa: grade.id_siswa,
+          nama_siswa: grade.nama_siswa,
+          total_mapel_nilai: 0,
+          count_mapel_nilai: 0,
+        });
+      }
+      const studentSubjectData = studentsInSubjectMap.get(grade.id_siswa);
+      
+      const displayKey = grade.jenis_nilai === 'TP' && grade.urutan_tp 
+        ? `${grade.jenis_nilai} ${grade.urutan_tp}` 
+        : grade.jenis_nilai;
+      
+      studentSubjectData[displayKey] = grade.nilai;
+      studentSubjectData.total_mapel_nilai += grade.nilai;
+      studentSubjectData.count_mapel_nilai++;
+
+      if (!uniqueTipeNilaiPerMapel.has(grade.nama_mapel)) {
+        uniqueTipeNilaiPerMapel.set(grade.nama_mapel, new Set());
+      }
+      uniqueTipeNilaiPerMapel.get(grade.nama_mapel).add(displayKey);
+
+      const studentSummary = summaryStudentMap.get(grade.id_siswa);
+      studentSummary.overall_total += grade.nilai;
+      studentSummary.overall_count++;
+
+      if (!studentSummary.subject_totals.has(grade.nama_mapel)) {
+        studentSummary.subject_totals.set(grade.nama_mapel, { total: 0, count: 0 });
+      }
+      const subjectTotal = studentSummary.subject_totals.get(grade.nama_mapel);
+      subjectTotal.total += grade.nilai;
+      subjectTotal.count++;
+
+      if (!subjectChartMap.has(grade.nama_mapel)) {
+        subjectChartMap.set(grade.nama_mapel, { total_nilai: 0, count: 0 });
+      }
+      const subjectChart = subjectChartMap.get(grade.nama_mapel);
+      subjectChart.total_nilai += grade.nilai;
+      subjectChart.count++;
+    });
+
+    const finalGradesPerSubjectTable = new Map();
+    gradesPerSubjectTable.forEach((studentsMap, nama_mapel) => {
+      const studentList = Array.from(studentsMap.values()).map(student => ({
+        ...student,
+        rata_rata_mapel: student.count_mapel_nilai > 0 ? parseFloat((student.total_mapel_nilai / student.count_mapel_nilai).toFixed(2)) : 0,
+      })).sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa));
+      finalGradesPerSubjectTable.set(nama_mapel, studentList);
+    });
+
+    const summaryTableData = Array.from(summaryStudentMap.values()).map(student => {
+      const studentSummaryObj = {
+        id_siswa: student.id_siswa,
+        nama_siswa: student.nama_siswa,
+        overall_final_average: student.overall_count > 0 ? parseFloat((student.overall_total / student.overall_count).toFixed(2)) : 0,
+      };
+      student.subject_totals.forEach((data, nama_mapel) => {
+        studentSummaryObj[`${nama_mapel}_RataRata`] = data.count > 0 ? parseFloat((data.total / data.count).toFixed(2)) : null;
+      });
+      return studentSummaryObj;
+    }).sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa));
+
+    const gradeDistributionCounts = { 'A (90-100)': 0, 'B (80-89)': 0, 'C (70-79)': 0, 'D (60-69)': 0, 'E (<60)': 0 };
+    summaryTableData.forEach(student => {
+      const average = student.overall_final_average;
+      if (average >= 90) gradeDistributionCounts['A (90-100)']++;
+      else if (average >= 80) gradeDistributionCounts['B (80-89)']++;
+      else if (average >= 70) gradeDistributionCounts['C (70-79)']++;
+      else if (average >= 60) gradeDistributionCounts['D (60-69)']++;
+      else gradeDistributionCounts['E (<60)']++;
+    });
+    const totalStudentsForDistribution = Object.values(gradeDistributionCounts).reduce((sum, count) => sum + count, 0);
+    const gradeDistributionChart = Object.entries(gradeDistributionCounts).map(([range, count]) => ({
+      name: range,
+      value: count,
+      percentage: totalStudentsForDistribution > 0 ? parseFloat(((count / totalStudentsForDistribution) * 100).toFixed(2)) : 0,
+    }));
+
+    const gradesByStudentChart = Array.from(summaryStudentMap.values()).map(student => ({
+      nama_siswa: student.nama_siswa,
+      rata_rata: student.overall_count > 0 ? parseFloat((student.overall_total / student.overall_count).toFixed(2)) : 0,
+    })).sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa));
+
+    // Build gradesBySubjectChart using ALL subjects taught in the class
+    // so subjects without any recorded nilai will still show up (hasData=false)
+    const allSubjects = Array.from(finalGradesPerSubjectTable.keys()).sort();
+    let gradesBySubjectChart = allSubjects.map(name => {
+      const data = subjectChartMap.get(name);
+      const hasData = !!data && data.count > 0;
+      const rata = hasData ? parseFloat((data.total_nilai / data.count).toFixed(2)) : 0;
+      return { nama_mapel: name, rata_rata: rata, hasData };
+    });
+
+    // Wali kelas bisa lihat semua mata pelajaran yang diajar di kelasnya
+    const filteredGradesPerSubjectTable = finalGradesPerSubjectTable;
+    const filteredUniqueTipeNilaiPerMapel = uniqueTipeNilaiPerMapel;
+
+    setProcessedData({
+      gradesPerSubjectTable: filteredGradesPerSubjectTable,
+      summaryTableData,
+      uniqueTipeNilaiPerMapel: filteredUniqueTipeNilaiPerMapel,
+      gradesByStudentChart,
+      gradesBySubjectChart,
+      gradeDistributionChart,
+    });
+  };
+
+  const sortedSummaryData = useMemo(() => {
+    let sortableItems = [...processedData.summaryTableData];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+
+        if (typeof aValue === 'string') {
+          return sortConfig.direction === 'ascending' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+        } else {
+          aValue = aValue === null ? -Infinity : aValue;
+          bValue = bValue === null ? -Infinity : bValue;
+
+          if (aValue < bValue) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+          }
+          if (aValue > bValue) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+          }
+          return 0;
+        }
+      });
+    }
+    return sortableItems;
+  }, [processedData.summaryTableData, sortConfig]);
+
+  const requestSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    } else if (sortConfig.key === key && sortConfig.direction === 'descending') {
+      direction = 'none';
+      key = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIndicator = (key) => {
+    if (sortConfig.key === key) {
+      if (sortConfig.direction === 'ascending') return ' ▲';
+      if (sortConfig.direction === 'descending') return ' ▼';
+    }
+    return '';
+  };
+
+  if (loading) return <LoadingSpinner message="Memuat dashboard wali kelas..." />;
+  if (error) return <StatusMessage type="error" message={error} />;
+  if (classList.length === 0) return <StatusMessage type="info" message="Anda bukan wali kelas untuk tahun ajaran dan semester aktif ini." />;
+  if (!classInfo) return <StatusMessage type="info" message="Silakan pilih kelas atau tunggu data dimuat." />;
+
+  const allSubjectNames = Array.from(processedData.gradesPerSubjectTable.keys()).sort();
+
+  // Prepare student history chart data so each period contains values for all mapel (fill missing with null)
+  const studentHistoryMapels = studentHistory && studentHistory.data ? Array.from(new Set(studentHistory.data.map(d => d.nama_mapel))) : [];
+  const studentHistoryChartData = studentHistory && studentHistory.data ? (() => {
+    const grouped = {};
+    studentHistory.data.forEach(item => {
+      const periodStr = `${item.tahun_ajaran} ${item.semester}`;
+      if (!grouped[periodStr]) grouped[periodStr] = { period: periodStr };
+      grouped[periodStr][item.nama_mapel] = parseFloat(item.rata_keseluruhan || 0);
+    });
+    return Object.keys(grouped).sort().map(period => {
+      const obj = grouped[period];
+      studentHistoryMapels.forEach(m => { if (!(m in obj)) obj[m] = null; });
+      return obj;
+    });
+  })() : [];
+
+  // Radar chart data: current semester averages for selected student
+  const radarData = selectedStudent ? allSubjectNames.map(subject => ({
+    subject,
+    value: selectedStudent[`${subject}_RataRata`] !== null && selectedStudent[`${subject}_RataRata`] !== undefined ? selectedStudent[`${subject}_RataRata`] : 0,
+  })) : [];
+
+  // Combined multi-semester radar data (average across all periods in studentHistory)
+  const radarCombinedData = (studentHistory && studentHistory.data && studentHistory.data.length > 0) ? (() => {
+    const map = new Map();
+    // accumulate totals and counts per mapel
+    studentHistory.data.forEach(item => {
+      const mapel = item.nama_mapel;
+      const val = parseFloat(item.rata_keseluruhan);
+      if (isNaN(val)) return;
+      if (!map.has(mapel)) map.set(mapel, { total: 0, count: 0 });
+      const cur = map.get(mapel);
+      cur.total += val;
+      cur.count += 1;
+    });
+
+    // use allSubjectNames so we keep consistent order and include subjects even if only present in current semester
+    const subjects = allSubjectNames.length ? allSubjectNames : Array.from(map.keys());
+    return subjects.map(subject => {
+      const entry = map.get(subject);
+      const value = entry && entry.count > 0 ? parseFloat((entry.total / entry.count).toFixed(2)) : (selectedStudent ? (selectedStudent[`${subject}_RataRata`] || 0) : 0);
+      return { subject, value };
+    });
+  })() : [];
+
+  const totalStudents = processedData.summaryTableData.length; 
+  const avgClassGrade = totalStudents > 0 
+    ? (processedData.summaryTableData.reduce((sum, s) => sum + s.overall_final_average, 0) / totalStudents).toFixed(2)
+    : 0;
+
+  // make bar chart taller when many subjects to avoid overcrowding
+  const subjectChartHeight = Math.max(300, (processedData.gradesBySubjectChart || []).length * 36);
+  const studentsAbove75 = processedData.summaryTableData.filter(s => s.overall_final_average >= 75).length;
+  
+  // Check if student has ANY subject below 60 (not just overall average)
+  const studentsNeedingAttention = processedData.summaryTableData.filter(student => {
+    return allSubjectNames.some(subject => {
+      const subjectAvg = student[`${subject}_RataRata`];
+      return subjectAvg !== null && subjectAvg < 60;
+    });
+  });
+  const studentsBelow60 = studentsNeedingAttention.length;
+
+  return (
+    <ModuleContainer>
+      <PageHeader
+        icon="chart-line"
+        title={`Dashboard Wali Kelas: ${classInfo.nama_kelas}`}
+        subtitle={`Tahun Ajaran ${activeTASemester.tahun_ajaran} - Semester ${activeTASemester.semester}`}
+      />
+
+      {classList.length > 1 && (
+        <FormSection title="Pilih Kelas">
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Kelas yang Anda Wali
+              </label>
+              <select
+                value={selectedClass || ''}
+                onChange={(e) => setSelectedClass(parseInt(e.target.value))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors bg-white"
+              >
+                {classList.map((kelas) => (
+                  <option key={kelas.id_kelas} value={kelas.id_kelas}>
+                    {kelas.nama_kelas} ({kelas.jumlah_siswa} siswa)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </FormSection>
+      )}
+
+      <div className="mb-6 border-b border-gray-200">
+        <div className="flex flex-wrap gap-2 sm:gap-4">
+          <Button
+            variant={activeView === 'overview' ? 'primary' : 'ghost'}
+            icon="chart-pie"
+            onClick={() => setActiveView('overview')}
+          >
+            Overview
+          </Button>
+          <Button
+            variant={activeView === 'students' ? 'primary' : 'ghost'}
+            icon="users"
+            onClick={() => setActiveView('students')}
+          >
+            Daftar Siswa ({totalStudents})
+          </Button>
+          <Button
+            variant={activeView === 'grades' ? 'primary' : 'ghost'}
+            icon="clipboard-list"
+            onClick={() => setActiveView('grades')}
+          >
+            Nilai Detail
+          </Button>
+          <Button
+            variant={activeView === 'earlyWarning' ? 'primary' : 'ghost'}
+            icon="exclamation-triangle"
+            onClick={() => setActiveView('earlyWarning')}
+          >
+            Early Warning
+            {earlyWarningsData && earlyWarningsData.summary && earlyWarningsData.summary.studentsWithWarnings > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-red-500 text-white rounded-full text-xs font-bold">
+                {earlyWarningsData.summary.studentsWithWarnings}
+              </span>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {activeView === 'overview' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg shadow-sm">
+              <p className="text-sm text-gray-600 mb-1">Total Siswa</p>
+              <p className="text-3xl font-bold text-blue-600">{totalStudents}</p>
+            </div>
+            <div className="p-6 bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg shadow-sm">
+              <p className="text-sm text-gray-600 mb-1">Rata-rata Kelas</p>
+              <p className="text-3xl font-bold text-green-600">{avgClassGrade}</p>
+            </div>
+            <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg shadow-sm">
+              <p className="text-sm text-gray-600 mb-1">Nilai ≥ 75</p>
+              <p className="text-3xl font-bold text-purple-600">{studentsAbove75}</p>
+              <p className="text-xs text-gray-500">{totalStudents > 0 ? ((studentsAbove75/totalStudents)*100).toFixed(0) : 0}% siswa</p>
+            </div>
+            <div className="p-6 bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg shadow-sm">
+              <p className="text-sm text-gray-600 mb-1">Perlu Perhatian</p>
+              <p className="text-3xl font-bold text-red-600">{studentsBelow60}</p>
+              <p className="text-xs text-gray-500">Ada mapel {'<'} 60</p>
+            </div>
+          </div>
+          
+          {/* Early Warning Summary Card */}
+          {earlyWarningsData && earlyWarningsData.summary && earlyWarningsData.summary.studentsWithWarnings > 0 && (
+            <div className="p-6 bg-gradient-to-br from-orange-50 to-red-50 border-l-4 border-red-500 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-red-900 flex items-center">
+                  <i className="fas fa-exclamation-triangle mr-2"></i>
+                  Early Warning System
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveView('earlyWarning')}
+                >
+                  Lihat Detail
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+                <div className="p-3 bg-white rounded shadow-sm">
+                  <p className="text-xs text-gray-600">Siswa Bermasalah</p>
+                  <p className="text-2xl font-bold text-gray-800">{earlyWarningsData.summary.studentsWithWarnings}</p>
+                </div>
+                <div className="p-3 bg-red-100 rounded shadow-sm">
+                  <p className="text-xs text-red-700">Critical</p>
+                  <p className="text-2xl font-bold text-red-800">{earlyWarningsData.summary.criticalCount}</p>
+                </div>
+                <div className="p-3 bg-yellow-100 rounded shadow-sm">
+                  <p className="text-xs text-yellow-700">High Priority</p>
+                  <p className="text-2xl font-bold text-yellow-800">{earlyWarningsData.summary.highCount}</p>
+                </div>
+                <div className="p-3 bg-orange-100 rounded shadow-sm">
+                  <p className="text-xs text-orange-700">Medium</p>
+                  <p className="text-2xl font-bold text-orange-800">{earlyWarningsData.summary.mediumCount}</p>
+                </div>
+              </div>
+              
+              <p className="text-sm text-gray-700">
+                <i className="fas fa-info-circle mr-1"></i>
+                {earlyWarningsData.summary.studentsWithWarnings} dari {earlyWarningsData.summary.totalStudents} siswa 
+                memerlukan perhatian khusus berdasarkan analisis time series.
+              </p>
+            </div>
+          )}
+
+          {studentsBelow60 > 0 && (
+            <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-lg">
+              <h3 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center">
+                <i className="fas fa-exclamation-triangle mr-2"></i>
+                Siswa yang Perlu Perhatian Khusus
+              </h3>
+              <p className="text-sm text-gray-700 mb-4">
+                Siswa dengan nilai mata pelajaran di bawah 60 (KKM)
+              </p>
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-white border rounded">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-2 border text-left">Nama Siswa</th>
+                      <th className="px-4 py-2 border text-left">Mata Pelajaran Bermasalah</th>
+                      <th className="px-4 py-2 border text-center">Rata-rata Keseluruhan</th>
+                      <th className="px-4 py-2 border text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentsNeedingAttention
+                      .sort((a, b) => {
+                        // Sort by number of subjects below 60 (descending), then by overall average
+                        const aCount = allSubjectNames.filter(s => a[`${s}_RataRata`] < 60).length;
+                        const bCount = allSubjectNames.filter(s => b[`${s}_RataRata`] < 60).length;
+                        if (bCount !== aCount) return bCount - aCount;
+                        return a.overall_final_average - b.overall_final_average;
+                      })
+                      .map(student => {
+                        const subjectsBelow60 = allSubjectNames.filter(subject => {
+                          const avg = student[`${subject}_RataRata`];
+                          return avg !== null && avg < 60;
+                        });
+                        
+                        return (
+                          <tr key={student.id_siswa} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 border font-medium">{student.nama_siswa}</td>
+                            <td className="px-4 py-2 border">
+                              <div className="flex flex-wrap gap-1">
+                                {subjectsBelow60.map(subject => (
+                                  <span key={subject} className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium">
+                                    {subject}: {student[`${subject}_RataRata`]}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 border text-center">
+                              <span className={`px-2 py-1 rounded font-semibold ${
+                                student.overall_final_average >= 75 ? 'bg-green-100 text-green-800' :
+                                student.overall_final_average >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {student.overall_final_average}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 border text-center">
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => handleStudentClick(student)}
+                              >
+                                Lihat Detail
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="p-6 bg-green-50 border border-green-300 rounded-lg">
+            <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center">
+              <i className="fas fa-trophy mr-2"></i>
+              Top 5 Siswa Berprestasi
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {processedData.summaryTableData
+                .sort((a, b) => b.overall_final_average - a.overall_final_average)
+                .slice(0, 5)
+                .map((student, idx) => (
+                  <div key={student.id_siswa} className="p-3 bg-white border border-green-200 rounded text-center">
+                    <div className="text-2xl mb-1">
+                      {idx === 0 && '🥇'}
+                      {idx === 1 && '🥈'}
+                      {idx === 2 && '🥉'}
+                      {idx > 2 && `#${idx + 1}`}
+                    </div>
+                    <p className="text-sm font-medium text-gray-700 truncate">{student.nama_siswa}</p>
+                    <p className="text-lg font-bold text-green-600">{student.overall_final_average}</p>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Grafik Section - Stacked Vertically */}
+          <div className="space-y-6">
+            <div className="p-4 border rounded-lg bg-white shadow">
+              <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <i className="fas fa-chart-bar mr-2 text-indigo-600"></i>
+                Rata-rata per Mata Pelajaran
+              </h4>
+              <ResponsiveContainer width="100%" height={subjectChartHeight}>
+                <BarChart
+                  data={processedData.gradesBySubjectChart}
+                  layout="vertical"
+                  // Reduce left margin and axis width so chart content aligns more to the left
+                  margin={{ top: 5, right: 30, left: 50, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" domain={[0, 100]} />
+                  {/* Decrease YAxis width to free up horizontal space */}
+                  <YAxis dataKey="nama_mapel" type="category" width={180} />
+                  <Tooltip formatter={(value, name, props) => {
+                    const payload = props && props.payload ? props.payload : {};
+                    if (payload && payload.hasData === false) return ['Belum ada nilai', 'Rata-rata'];
+                    return [value, 'Rata-rata'];
+                  }} />
+                  <Bar dataKey="rata_rata" radius={[0, 8, 8, 0]}>
+                    {processedData.gradesBySubjectChart.map((entry) => (
+                      <Cell key={`cell-${entry.nama_mapel}`} fill={entry.hasData ? '#00C49F' : '#e5e7eb'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="p-4 border rounded-lg bg-white shadow">
+              <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <i className="fas fa-chart-pie mr-2 text-indigo-600"></i>
+                Distribusi Nilai Kelas
+              </h4>
+              <ResponsiveContainer width="100%" height={350}>
+                <PieChart>
+                  <Pie
+                    data={processedData.gradeDistributionChart}
+                    cx="50%"  // shift pie chart to the left
+                    cy="50%"
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {processedData.gradeDistributionChart.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => `${value} siswa`} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeView === 'students' && (
+        <div>
+          <div className="mb-4 flex justify-between items-center">
+            <h3 className="text-xl font-semibold text-gray-800">
+              Daftar Siswa Kelas {classInfo.nama_kelas}
+            </h3>
+            <div className="text-sm text-gray-600">
+              Total: {totalStudents} siswa
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border rounded-lg">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-4 py-3 border text-left">No</th>
+                  <th className="px-4 py-3 border text-left">ID Siswa</th>
+                  <th className="px-4 py-3 border text-left">Nama Siswa</th>
+                  <th className="px-4 py-3 border text-center">Rata-rata</th>
+                  <th className="px-4 py-3 border text-center">Status</th>
+                  <th className="px-4 py-3 border text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedSummaryData.map((student, idx) => {
+                  const status = student.overall_final_average >= 75 ? 'Baik' : 
+                                 student.overall_final_average >= 60 ? 'Cukup' : 'Perlu Perhatian';
+                  const statusColor = student.overall_final_average >= 75 ? 'bg-green-100 text-green-800' : 
+                                      student.overall_final_average >= 60 ? 'bg-yellow-100 text-yellow-800' : 
+                                      'bg-red-100 text-red-800';
+                  
+                  return (
+                    <tr key={student.id_siswa} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 border">{idx + 1}</td>
+                      <td className="px-4 py-3 border">{student.id_siswa}</td>
+                      <td className="px-4 py-3 border font-medium">{student.nama_siswa}</td>
+                      <td className="px-4 py-3 border text-center">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold">
+                          {student.overall_final_average}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 border text-center">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 border text-center">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon="chart-line"
+                          onClick={() => handleStudentClick(student)}
+                        >
+                          Lihat Histori
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeView === 'grades' && !gradesData ? (
+        <EmptyState
+          icon="clipboard-list"
+          title="Belum Ada Nilai"
+          message={`Belum ada nilai yang diinput untuk kelas ${classInfo.nama_kelas} di semester ini.`}
+        />
+      ) : activeView === 'grades' && (
+        <div className="space-y-8">
+          {Array.from(processedData.gradesPerSubjectTable.entries()).map(([nama_mapel, studentsGradeList]) => {
+            const uniqueTipeNilai = Array.from(processedData.uniqueTipeNilaiPerMapel.get(nama_mapel) || []).sort();
+
+            return (
+              <div key={nama_mapel} className="border rounded-lg p-4 bg-gray-50">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <i className="fas fa-book mr-2 text-indigo-600"></i>
+                  Detail Nilai {nama_mapel}
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 border text-left">Nama Siswa</th>
+                        {uniqueTipeNilai.map(tipe => (
+                          <th key={tipe} className="px-4 py-2 border text-center">{tipe}</th>
+                        ))}
+                        <th className="px-4 py-2 border text-center">Rata-rata {nama_mapel}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {studentsGradeList.map(student => (
+                        <tr key={student.id_siswa} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 border font-medium">{student.nama_siswa}</td>
+                          {uniqueTipeNilai.map(tipe => (
+                            <td key={`${student.id_siswa}-${tipe}`} className="px-4 py-2 border text-center">
+                              {student[tipe] !== undefined ? student[tipe] : '-'}
+                            </td>
+                          ))}
+                          <td className="px-4 py-2 border text-center">
+                            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full font-semibold">
+                              {student.rata_rata_mapel}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="border rounded-lg p-4 bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+              <i className="fas fa-table mr-2 text-indigo-600"></i>
+              Ringkasan Nilai Siswa Keseluruhan
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th
+                      className="px-4 py-3 border text-left cursor-pointer hover:bg-gray-200"
+                      onClick={() => requestSort('nama_siswa')}
+                    >
+                      Nama Siswa {getSortIndicator('nama_siswa')}
+                    </th>
+                    {allSubjectNames.map(subject => (
+                      <th
+                        key={subject}
+                        className="px-4 py-3 border text-center cursor-pointer hover:bg-gray-200"
+                        onClick={() => requestSort(`${subject}_RataRata`)}
+                      >
+                        {subject} {getSortIndicator(`${subject}_RataRata`)}
+                      </th>
+                    ))}
+                    <th
+                      className="px-4 py-3 border text-center cursor-pointer hover:bg-gray-200"
+                      onClick={() => requestSort('overall_final_average')}
+                    >
+                      Rata-rata Akhir {getSortIndicator('overall_final_average')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedSummaryData.map(student => (
+                    <tr key={student.id_siswa} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 border font-medium">{student.nama_siswa}</td>
+                      {allSubjectNames.map(subject => (
+                        <td key={`${student.id_siswa}-${subject}_RataRata`} className="px-4 py-3 border text-center">
+                          {student[`${subject}_RataRata`] !== null ? student[`${subject}_RataRata`] : '-'}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 border text-center">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-bold">
+                          {student.overall_final_average}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeView === 'studentDetail' && selectedStudent && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800">{selectedStudent.nama_siswa}</h3>
+              <p className="text-gray-600">ID: {selectedStudent.id_siswa}</p>
+            </div>
+            <Button
+              variant="outline"
+              icon="arrow-left"
+              onClick={() => {
+                setActiveView('students');
+                setSelectedStudent(null);
+                setStudentHistory(null);
+              }}
+            >
+              Kembali ke Daftar Siswa
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-gray-600 mb-1">Rata-rata Semester Ini</p>
+              <p className="text-3xl font-bold text-blue-600">{selectedStudent.overall_final_average}</p>
+            </div>
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-gray-600 mb-1">Mapel Tertinggi</p>
+              <p className="text-xl font-bold text-green-600">
+                {(() => {
+                  let highest = 0;
+                  let mapelName = '-';
+                  allSubjectNames.forEach(subject => {
+                    const avg = selectedStudent[`${subject}_RataRata`];
+                    if (avg && avg > highest) {
+                      highest = avg;
+                      mapelName = subject;
+                    }
+                  });
+                  return mapelName;
+                })()}
+              </p>
+              <p className="text-sm text-gray-500">
+                {Math.max(...allSubjectNames.map(s => selectedStudent[`${s}_RataRata`] || 0))}
+              </p>
+            </div>
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-gray-600 mb-1">Mapel Terendah</p>
+              <p className="text-xl font-bold text-red-600">
+                {(() => {
+                  let lowest = 100;
+                  let mapelName = '-';
+                  allSubjectNames.forEach(subject => {
+                    const avg = selectedStudent[`${subject}_RataRata`];
+                    if (avg && avg < lowest) {
+                      lowest = avg;
+                      mapelName = subject;
+                    }
+                  });
+                  return mapelName;
+                })()}
+              </p>
+              <p className="text-sm text-gray-500">
+                {Math.min(...allSubjectNames.map(s => selectedStudent[`${s}_RataRata`] || 100).filter(v => v > 0))}
+              </p>
+            </div>
+          </div>
+
+          {studentHistory && studentHistory.data && studentHistory.data.length > 0 && (
+            <div>
+              <div className="mb-6 p-4 bg-white border rounded-lg shadow">
+                <h4 className="font-semibold text-gray-700 mb-4">
+                  <i className="fas fa-chart-line mr-2"></i>
+                  Histori Nilai Siswa (Multi-Semester)
+                </h4>
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={studentHistoryChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="period" angle={-25} textAnchor="end" height={100} interval={0} />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Legend />
+                    {studentHistoryMapels.map((mapel, idx) => (
+                      <Line
+                        key={idx}
+                        type="monotone"
+                        dataKey={mapel}
+                        stroke={COLORS[idx % COLORS.length]}
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        connectNulls={true}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="mt-6 p-4 bg-white border rounded-lg shadow">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-700 mb-4 flex items-center">
+                    <i className="fas fa-network-wired mr-2"></i>
+                    Profil Mata Pelajaran (Radar)
+                  </h4>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant={radarMode === 'current' ? 'primary' : 'ghost'} onClick={() => setRadarMode('current')}>Semester Ini</Button>
+                    <Button size="sm" variant={radarMode === 'multi' ? 'primary' : 'ghost'} onClick={() => setRadarMode('multi')} disabled={!studentHistory || !studentHistory.data || studentHistory.data.length === 0}>Semua Semester</Button>
+                  </div>
+                </div>
+                {allSubjectNames.length === 0 ? (
+                  <div className="text-sm text-gray-600">Belum ada mata pelajaran untuk ditampilkan.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={350}>
+                    <RadarChart cx="50%" cy="50%" outerRadius={120} data={radarMode === 'multi' ? radarCombinedData : radarData}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="subject" />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                      <Radar name={radarMode === 'multi' ? 'Semua Semester' : 'Semester Ini'} dataKey="value" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                      <Tooltip />
+                      <Legend />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 bg-white border rounded-lg shadow">
+            <h4 className="font-semibold text-gray-700 mb-4">Nilai Semester Ini</h4>
+            <div className="overflow-x-auto">
+              <table className="min-w-full border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-4 py-2 border text-left">Mata Pelajaran</th>
+                    <th className="px-4 py-2 border text-center">Rata-rata</th>
+                    <th className="px-4 py-2 border text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allSubjectNames.map(subject => {
+                    const avg = selectedStudent[`${subject}_RataRata`];
+                    const status = avg >= 75 ? 'Baik' : avg >= 60 ? 'Cukup' : 'Perlu Perbaikan';
+                    const statusColor = avg >= 75 ? 'text-green-600' : avg >= 60 ? 'text-yellow-600' : 'text-red-600';
+                    
+                    return (
+                      <tr key={subject} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 border">{subject}</td>
+                        <td className="px-4 py-2 border text-center font-semibold">{avg || '-'}</td>
+                        <td className={`px-4 py-2 border text-center ${statusColor}`}>{avg ? status : '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {/* Time Series Analysis Section */}
+          {timeSeriesLoading && <LoadingSpinner message="Memuat analisis time series..." />}
+          
+          {!timeSeriesLoading && timeSeriesData && timeSeriesData.analysis && timeSeriesData.analysis.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <h4 className="text-xl font-bold text-gray-800 flex items-center">
+                <i className="fas fa-chart-line mr-2 text-indigo-600"></i>
+                Analisis Time Series
+              </h4>
+              
+              {timeSeriesData.analysis.map(subject => (
+                <div key={subject.id_mapel} className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <h5 className="text-lg font-semibold text-gray-800 mb-4">{subject.nama_mapel}</h5>
+                  
+                  {/* Data Insufficiency Warning */}
+                  {subject.trend.error && (
+                    <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded">
+                      <div className="flex items-center">
+                        <i className="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                        <p className="text-sm text-red-800 font-medium">{subject.trend.message}</p>
+                      </div>
+                      <p className="text-xs text-red-600 mt-2">
+                        Data saat ini: {subject.trend.dataPoints} semester | 
+                        Minimal diperlukan: {subject.trend.requiredPoints} semester
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Trend Analysis */}
+                  {!subject.trend.error && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="p-4 bg-white border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm text-gray-600">Trend</p>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            subject.trend.confidenceColor === 'green' ? 'bg-green-100 text-green-800' :
+                            subject.trend.confidenceColor === 'blue' ? 'bg-blue-100 text-blue-700' :
+                            subject.trend.confidenceColor === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {subject.trend.confidenceLabel}
+                          </span>
+                        </div>
+                        <p className="text-2xl font-bold text-indigo-600 mb-1">
+                          {subject.trend.trend === 'naik_kuat' && '📈📈 Naik Kuat'}
+                          {subject.trend.trend === 'naik_stabil' && '📈 Naik Stabil'}
+                          {subject.trend.trend === 'stabil' && '➡️ Stabil'}
+                          {subject.trend.trend === 'turun_perlahan' && '📉 Turun Perlahan'}
+                          {subject.trend.trend === 'turun_signifikan' && '📉📉 Turun Signifikan'}
+                        </p>
+                        <p className="text-xs text-gray-500">Slope: {subject.trend.slope} poin/semester</p>
+                        <p className="text-xs text-gray-500">Data: {subject.trend.dataPoints} semester</p>
+                      </div>
+                      
+                      <div className="p-4 bg-white border rounded-lg">
+                        <p className="text-sm text-gray-600 mb-2">Interpretasi</p>
+                        <p className="text-sm text-gray-700">{subject.trend.interpretation}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {subject.trend.showWarning && (
+                    <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                      <p className="text-xs text-yellow-800">
+                        <i className="fas fa-info-circle mr-1"></i>
+                        {subject.trend.warningMessage}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Forecast */}
+                  {!subject.forecast.error && (
+                    <div className="p-4 bg-white border rounded-lg mb-4">
+                      <p className="text-sm text-gray-600 mb-2">Prediksi Semester Depan</p>
+                      <p className="text-3xl font-bold text-green-600">
+                        {subject.forecast.forecast}
+                        <span className="text-sm text-gray-500 ml-2">
+                          ±{subject.forecast.confidenceRange.toFixed(1)}
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Range: {subject.forecast.confidenceLower} - {subject.forecast.confidenceUpper}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-2">Metode: {subject.forecast.method}</p>
+                    </div>
+                  )}
+                  
+                  {subject.forecast.error && (
+                    <div className="p-3 bg-gray-50 border rounded mb-4">
+                      <p className="text-xs text-gray-600">
+                        <i className="fas fa-info-circle mr-1"></i>
+                        {subject.forecast.message}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Early Warnings */}
+                  {!subject.warnings.error && subject.warnings.warnings.length > 0 && (
+                    <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded">
+                      <p className="text-sm font-semibold text-red-800 mb-3">
+                        <i className="fas fa-exclamation-triangle mr-2"></i>
+                        Peringatan Terdeteksi ({subject.warnings.warnings.length})
+                      </p>
+                      <div className="space-y-2">
+                        {subject.warnings.warnings.map((warning, idx) => (
+                          <div key={idx} className="p-3 bg-white rounded">
+                            <div className="flex items-start">
+                              <span className="text-xl mr-2">{warning.icon}</span>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-800">{warning.message}</p>
+                                <p className="text-xs text-gray-600 mt-1">{warning.detail}</p>
+                                <p className="text-xs text-gray-700 italic mt-2">
+                                  💡 {warning.recommendation}
+                                </p>
+                              </div>
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                warning.severity === 'critical' ? 'bg-red-100 text-red-800' :
+                                warning.severity === 'high' ? 'bg-orange-100 text-orange-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {warning.severity.toUpperCase()}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Early Warning View */}
+      {activeView === 'earlyWarning' && (
+        <div className="space-y-6">
+          {earlyWarningsLoading && <LoadingSpinner message="Memuat early warning data..." />}
+          
+          {!earlyWarningsLoading && !earlyWarningsData && (
+            <div className="p-6 bg-yellow-50 border border-yellow-300 rounded-lg text-center">
+              <i className="fas fa-exclamation-circle text-yellow-600 text-3xl mb-3"></i>
+              <p className="text-gray-700 font-medium">Tidak dapat memuat data early warning.</p>
+              <p className="text-sm text-gray-600 mt-2">Pastikan ada data nilai untuk kelas ini.</p>
+              <Button
+                variant="primary"
+                icon="sync"
+                onClick={fetchEarlyWarnings}
+                className="mt-4"
+              >
+                Coba Lagi
+              </Button>
+            </div>
+          )}
+          
+          {!earlyWarningsLoading && earlyWarningsData && (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                  <p className="text-sm text-gray-600">Total Siswa</p>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {earlyWarningsData.summary.totalStudents}
+                  </p>
+                </div>
+                
+                <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded">
+                  <p className="text-sm text-gray-600">Critical</p>
+                  <p className="text-3xl font-bold text-red-600">
+                    {earlyWarningsData.summary.criticalCount}
+                  </p>
+                  <p className="text-xs text-gray-500">Butuh tindakan segera</p>
+                </div>
+                
+                <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                  <p className="text-sm text-gray-600">High Priority</p>
+                  <p className="text-3xl font-bold text-yellow-600">
+                    {earlyWarningsData.summary.highCount}
+                  </p>
+                  <p className="text-xs text-gray-500">Perlu perhatian khusus</p>
+                </div>
+                
+                <div className="p-4 bg-orange-50 border-l-4 border-orange-500 rounded">
+                  <p className="text-sm text-gray-600">Medium</p>
+                  <p className="text-3xl font-bold text-orange-600">
+                    {earlyWarningsData.summary.mediumCount}
+                  </p>
+                  <p className="text-xs text-gray-500">Monitor ketat</p>
+                </div>
+              </div>
+              
+              {/* No Warnings Message */}
+              {earlyWarningsData.summary.totalWarnings === 0 && (
+                <div className="p-6 bg-green-50 border border-green-200 rounded-lg text-center">
+                  <i className="fas fa-check-circle text-5xl text-green-500 mb-3"></i>
+                  <h3 className="text-xl font-bold text-green-800 mb-2">Excellent!</h3>
+                  <p className="text-gray-700">Tidak ada early warning terdeteksi di kelas ini.</p>
+                  <p className="text-sm text-gray-600 mt-1">Semua siswa menunjukkan performa yang baik.</p>
+                </div>
+              )}
+              
+              {/* Critical Warnings */}
+              {earlyWarningsData.warnings.critical.length > 0 && (
+                <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+                  <h3 className="text-lg font-bold text-red-900 mb-4 flex items-center">
+                    <i className="fas fa-exclamation-circle mr-2"></i>
+                    Siswa yang Butuh Perhatian SEGERA ({earlyWarningsData.warnings.critical.length})
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    {earlyWarningsData.warnings.critical.map((student, idx) => (
+                      <div key={idx} className="bg-white p-4 rounded border-l-4 border-red-500">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h4 className="font-bold text-gray-900">{student.nama_siswa}</h4>
+                            <p className="text-sm text-gray-600">
+                              Bermasalah di {student.subjects.length} mata pelajaran
+                            </p>
+                          </div>
+                          <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">
+                            CRITICAL
+                          </span>
+                        </div>
+                        
+                        {/* List all subjects with warnings */}
+                        <div className="space-y-3 mb-3">
+                          {student.subjects.map((subject, sIdx) => (
+                            <div key={sIdx} className="bg-red-50 p-3 rounded">
+                              <div className="flex justify-between items-start mb-2">
+                                <p className="font-semibold text-gray-800">{subject.nama_mapel}</p>
+                                <span className="text-xs text-gray-500">{subject.dataPoints} semester</span>
+                              </div>
+                              
+                              <div className="space-y-1 mb-2">
+                                {subject.warnings.map((warning, wIdx) => (
+                                  <div key={wIdx} className="flex items-start text-sm">
+                                    <span className="mr-2">{warning.icon}</span>
+                                    <div className="flex-1">
+                                      <p className="font-medium text-gray-800">{warning.message}</p>
+                                      <p className="text-xs text-gray-600">{warning.detail}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              
+                              <div className="flex items-center space-x-2 text-sm">
+                                <span className="text-gray-600 text-xs">Histori:</span>
+                                {subject.history.map((h, hIdx) => (
+                                  <span key={hIdx} className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                    h.nilai < 60 ? 'bg-red-200 text-red-900' :
+                                    h.nilai < 75 ? 'bg-yellow-200 text-yellow-900' :
+                                    'bg-green-200 text-green-900'
+                                  }`}>
+                                    {h.nilai}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          icon="user"
+                          onClick={() => {
+                            const studentData = processedData.summaryTableData.find(s => s.id_siswa === student.id_siswa);
+                            if (studentData) handleStudentClick(studentData);
+                          }}
+                        >
+                          Lihat Detail Siswa
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* High Priority Warnings */}
+              {earlyWarningsData.warnings.high.length > 0 && (
+                <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <h3 className="text-lg font-bold text-yellow-900 mb-4 flex items-center">
+                    <i className="fas fa-exclamation-triangle mr-2"></i>
+                    Perhatian Khusus Diperlukan ({earlyWarningsData.warnings.high.length})
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {earlyWarningsData.warnings.high.map((student, idx) => (
+                      <div key={idx} className="bg-white p-4 rounded border-l-4 border-yellow-500">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="font-bold text-gray-900">{student.nama_siswa}</h4>
+                            <p className="text-xs text-gray-600">
+                              {student.subjects.length} mapel: {student.subjects.map(s => s.nama_mapel).join(', ')}
+                            </p>
+                          </div>
+                          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-bold">
+                            HIGH
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-1 mb-2">
+                          {student.subjects.slice(0, 2).map((subject, sIdx) => (
+                            <p key={sIdx} className="text-xs text-gray-700">
+                              {subject.warnings[0]?.icon} <span className="font-medium">{subject.nama_mapel}:</span> {subject.warnings[0]?.message}
+                            </p>
+                          ))}
+                          {student.subjects.length > 2 && (
+                            <p className="text-xs text-gray-500 italic">+{student.subjects.length - 2} mapel lainnya</p>
+                          )}
+                        </div>
+                        
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const studentData = processedData.summaryTableData.find(s => s.id_siswa === student.id_siswa);
+                            if (studentData) handleStudentClick(studentData);
+                          }}
+                        >
+                          Detail
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Medium Priority Warnings */}
+              {earlyWarningsData.warnings.medium.length > 0 && (
+                <details className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                  <summary className="cursor-pointer font-semibold text-orange-900">
+                    <i className="fas fa-info-circle mr-2"></i>
+                    Medium Priority ({earlyWarningsData.warnings.medium.length}) - Klik untuk lihat
+                  </summary>
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {earlyWarningsData.warnings.medium.map((student, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded text-sm">
+                        <p className="font-medium text-gray-900">{student.nama_siswa}</p>
+                        <p className="text-xs text-gray-600 mb-1">
+                          {student.subjects.length} mapel bermasalah
+                        </p>
+                        <div className="space-y-0.5">
+                          {student.subjects.map((subject, sIdx) => (
+                            <p key={sIdx} className="text-xs text-gray-700">
+                              • {subject.nama_mapel}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </ModuleContainer>
+  );
+};
+
+export default WaliKelasGradeView;
