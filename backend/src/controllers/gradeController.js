@@ -657,7 +657,7 @@ exports.importGradesFromExcel = async (req, res) => {
 /**
  * Helper function: Get TP list directly from Excel without HTTP call
  */
-async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
+async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText, id_ta_semester = null) {
     try {
         // Get kelas info
         const kelasRow = await new Promise((resolve, reject) => {
@@ -834,31 +834,37 @@ async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
 
         // 🆕 Get manual TP from database and merge
         try {
-            console.log('🔍 getTpListDirect - Checking manual TP for:', { id_mapel, id_kelas, semesterText });
+            console.log('🔍 getTpListDirect - Checking manual TP for:', { id_mapel, id_kelas, semesterText, id_ta_semester });
             
-            // Get id_ta_semester first to build composite key
-            const taSemesterRow = await new Promise((resolve, reject) => {
-                db.get(
-                    `SELECT id_ta_semester FROM tahunajaransemester WHERE semester = ?`,
-                    [semesterText],
-                    (err, row) => {
-                        if (err) reject(err);
-                        else resolve(row);
-                    }
-                );
-            });
+            // Use provided id_ta_semester if available, otherwise query by semester text
+            let targetTaSemester = id_ta_semester;
             
-            console.log('📅 getTpListDirect - TA Semester found:', taSemesterRow);
+            if (!targetTaSemester) {
+                const taSemesterRow = await new Promise((resolve, reject) => {
+                    db.get(
+                        `SELECT id_ta_semester FROM tahunajaransemester WHERE semester = ?`,
+                        [semesterText],
+                        (err, row) => {
+                            if (err) reject(err);
+                            else resolve(row);
+                        }
+                    );
+                });
+                
+                console.log('📅 getTpListDirect - TA Semester from text query:', taSemesterRow);
+                targetTaSemester = taSemesterRow ? taSemesterRow.id_ta_semester : null;
+            } else {
+                console.log('📅 getTpListDirect - Using provided id_ta_semester:', targetTaSemester);
+            }
             
-            if (taSemesterRow) {
-                // Check if guru-mapel-kelas assignment exists (need id_guru from somewhere)
-                // Since we don't have id_guru in getTpListDirect params, we need to get ANY guru for this mapel-kelas
+            if (targetTaSemester) {
+                // Check if guru-mapel-kelas assignment exists
                 const assignmentRow = await new Promise((resolve, reject) => {
                     db.get(
                         `SELECT id_guru, id_mapel, id_kelas, id_ta_semester FROM gurumatapelajarankelas
                          WHERE id_mapel = ? AND id_kelas = ? AND id_ta_semester = ?
                          LIMIT 1`,
-                        [id_mapel, id_kelas, taSemesterRow.id_ta_semester],
+                        [id_mapel, id_kelas, targetTaSemester],
                         (err, row) => {
                             if (err) reject(err);
                             else resolve(row);
@@ -879,7 +885,7 @@ async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
                             `SELECT tp_number, tp_name FROM manual_tp 
                              WHERE id_penugasan = ? AND id_ta_semester = ?
                              ORDER BY tp_number`,
-                            [id_penugasan, taSemesterRow.id_ta_semester],
+                            [id_penugasan, targetTaSemester],
                             (err, rows) => {
                                 if (err) reject(err);
                                 else resolve(rows);
@@ -1020,8 +1026,8 @@ exports.exportFinalGrades = async (req, res) => {
         }
         
         // 3. Get TP list from ATP Excel (filtered by semester) - Direct function call instead of HTTP
-        console.log('Getting TP list for:', { id_mapel, fase, id_kelas, semester: classInfo.semester });
-        const tpList = await getTpListDirect(db, id_mapel, fase, id_kelas, classInfo.semester);
+        console.log('Getting TP list for:', { id_mapel, fase, id_kelas, semester: classInfo.semester, id_ta_semester });
+        const tpList = await getTpListDirect(db, id_mapel, fase, id_kelas, classInfo.semester, id_ta_semester);
         console.log('TP List result:', tpList ? `${tpList.length} items` : 'null/empty');
         
         if (!tpList || tpList.length === 0) {
