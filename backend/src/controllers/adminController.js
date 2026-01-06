@@ -1172,7 +1172,7 @@ exports.promoteStudents = (req, res) => {
     // Menggunakan Promise.all untuk menangani operasi database asinkron dalam loop
     const promises = student_ids.map(id_siswa => {
         return new Promise((resolve, reject) => {
-            // Insert into new class while keeping old records for history/tracking
+            // Insert into new class/semester (keeping old records for history)
             db.run("INSERT INTO SiswaKelas (id_siswa, id_kelas, id_ta_semester) VALUES (?, ?, ?)",
                 [id_siswa, target_kelas_id, target_ta_semester_id],
                 function(err) {

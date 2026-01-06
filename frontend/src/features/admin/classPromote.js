@@ -134,17 +134,19 @@ const ClassPromote = () => {
           totalInserted += response.insertedCount || 0;
           totalFailed += response.failedCount || 0;
           
-          console.log(`✅ Class ${classGroup.kelas.nama_kelas}: ${response.insertedCount} inserted, ${response.failedCount} failed/duplicate`);
+          console.log(`📊 Class ${classGroup.kelas.nama_kelas}: ${response.insertedCount} inserted, ${response.failedCount} duplicate/failed`);
         } catch (err) {
           console.error(`❌ Failed to promote class ${classGroup.kelas.nama_kelas}:`, err);
           totalFailed += classGroup.students.length;
         }
       }
       
+      console.log(`🎯 Final result: ${totalInserted} inserted, ${totalFailed} failed/duplicate`);
+      
       if (totalInserted > 0) {
-        showMessage(`Berhasil memindahkan ${totalInserted} siswa ke semester baru!${totalFailed > 0 ? ` (${totalFailed} siswa sudah ada atau gagal)` : ''}`, 'success');
+        showMessage(`✅ Berhasil memindahkan ${totalInserted} siswa ke semester baru!${totalFailed > 0 ? ` (${totalFailed} siswa sudah ada sebelumnya)` : ''}`, 'success');
       } else if (totalFailed > 0) {
-        showMessage(`Tidak ada siswa yang dipindahkan. ${totalFailed} siswa sudah terdaftar di semester tujuan atau gagal.`, 'warning');
+        showMessage(`⚠️ Semua siswa (${totalFailed} siswa) SUDAH ADA di semester ${toSemester.semester}. Tidak ada yang dipindahkan karena data sudah ada. Ganti dropdown "Semester Sumber" ke semester ${toSemester.semester} untuk melihat data!`, 'warning');
       } else {
         showMessage('Tidak ada siswa yang diproses.', 'error');
       }
