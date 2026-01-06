@@ -539,12 +539,20 @@ const InputNilai = ({ activeTASemester, userId }) => {
       
       if (successful > 0 && failed === 0) {
         // Semua sukses
-        setMessage(`✓ Berhasil menyimpan ${successful} nilai!`);
+        setMessage(`✓ Berhasil menyimpan ${successful} nilai! Memuat data terbaru...`);
         setMessageType('success');
+        
+        // ✅ FIX: Re-fetch data dari server untuk update UI
+        await loadExistingGrades(kelasId, mapelId);
+        
+        setMessage(`✓ Berhasil menyimpan ${successful} nilai!`);
       } else if (successful > 0 && failed > 0) {
         // Sebagian sukses, sebagian gagal - WARNING
-        setMessage(`⚠️ ${successful} nilai berhasil, ${failed} nilai gagal. Periksa dan ulangi!`);
+        setMessage(`⚠️ ${successful} nilai berhasil, ${failed} nilai gagal. Memuat data terbaru...`);
         setMessageType('warning');
+        
+        // Re-fetch untuk update yang berhasil
+        await loadExistingGrades(kelasId, mapelId);
         
         // Log detail error untuk debugging
         const failedDetails = results
@@ -552,6 +560,8 @@ const InputNilai = ({ activeTASemester, userId }) => {
           .map(r => r.reason?.message || r.reason)
           .slice(0, 3); // Tampilkan max 3 error pertama
         console.warn('Failed saves:', failedDetails);
+        
+        setMessage(`⚠️ ${successful} nilai berhasil, ${failed} nilai gagal. Periksa dan ulangi!`);
       } else if (failed > 0) {
         // Semua gagal
         setMessage(`❌ Gagal menyimpan ${failed} nilai. Server tidak merespons atau error.`);
@@ -627,11 +637,22 @@ const InputNilai = ({ activeTASemester, userId }) => {
         setMessage(`⚠️ Import selesai dengan error: ${result.message}\n${result.errors.slice(0, 5).join(', ')}`);
         setMessageType('warning');
       } else {
-        setMessage(`✅ ${result.message}`);
+        setMessage(`✅ ${result.message} - Memuat data terbaru...`);
         setMessageType('success');
       }
 
+      // ✅ FIX: Tunggu sebentar untuk backend selesai commit ke database
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Re-fetch data dari server
       await loadExistingGrades(kelasId, mapelId);
+      
+      // Update message setelah reload
+      if (result.errors && result.errors.length > 0) {
+        setMessage(`⚠️ Import selesai: ${result.message}`);
+      } else {
+        setMessage(`✅ ${result.message} - Data berhasil dimuat!`);
+      }
     } catch (err) {
       setMessage(`❌ Gagal import nilai: ${err.message}`);
       setMessageType('error');
