@@ -59,22 +59,23 @@ exports.login = (req, res) => {
         });
         
         // ✅ Clear old cookie first to prevent conflicts
+        const cookieSameSite = process.env.COOKIE_SAME_SITE || 'none';
         res.clearCookie('authToken', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            secure: true,
+            sameSite: cookieSameSite,
             path: '/'
         });
         
         // Set JWT token sebagai HTTP-only cookie (XSS protection)
-        // ✅ iOS Safari compatibility fix
+        // ✅ Flexible deployment: Azure (cross-origin) vs VM (same-origin)
+        const cookieSameSite = process.env.COOKIE_SAME_SITE || 'none'; // 'none' for Azure, 'lax' for VM
         res.cookie('authToken', token, {
             httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
-            secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
-            sameSite: 'lax',     // ✅ Changed: 'lax' works better for iOS Safari
+            secure: true,        // ✅ ALWAYS true for HTTPS (Azure & VM production)
+            sameSite: cookieSameSite,  // ✅ 'none' (Azure cross-origin) or 'lax' (VM same-origin)
             maxAge: 5 * 60 * 60 * 1000,  // 5 hours (sesuai JWT_EXPIRES_IN)
-            path: '/',           // ✅ Added: Explicit path for better compatibility
-            domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined // ✅ Added: Domain control
+            path: '/'            // ✅ Explicit path for better compatibility
         });
         
         res.status(200).json({
@@ -217,22 +218,23 @@ exports.login = (req, res) => {
             });
             
             // ✅ Clear old cookie first to prevent conflicts
+            const cookieSameSite = process.env.COOKIE_SAME_SITE || 'none';
             res.clearCookie('authToken', {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
+                secure: true,
+                sameSite: cookieSameSite,
                 path: '/'
             });
             
             // Set JWT token sebagai HTTP-only cookie (XSS protection)
-            // ✅ iOS Safari compatibility fix
+            // ✅ Flexible deployment: Azure (cross-origin) vs VM (same-origin)
+            const cookieSameSite = process.env.COOKIE_SAME_SITE || 'none'; // 'none' for Azure, 'lax' for VM
             res.cookie('authToken', token, {
                 httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
-                secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
-                sameSite: 'lax',     // ✅ Changed: 'lax' works better for iOS Safari
+                secure: true,        // ✅ ALWAYS true for HTTPS (Azure & VM production)
+                sameSite: cookieSameSite,  // ✅ 'none' (Azure cross-origin) or 'lax' (VM same-origin)
                 maxAge: 5 * 60 * 60 * 1000,  // 5 hours (sesuai JWT_EXPIRES_IN)
-                path: '/',           // ✅ Added: Explicit path for better compatibility
-                domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined // ✅ Added: Domain control
+                path: '/'            // ✅ Explicit path for better compatibility
             });
             
             res.status(200).json({
@@ -309,13 +311,13 @@ exports.logout = (req, res) => {
     }
     
     // Clear the HTTP-only cookie
-    // ✅ iOS Safari compatibility fix
+    // ✅ Flexible deployment: match sameSite with cookie creation
+    const cookieSameSite = process.env.COOKIE_SAME_SITE || 'none';
     res.clearCookie('authToken', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',  // ✅ Changed: Match cookie creation settings
-        path: '/',
-        domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined
+        secure: true,
+        sameSite: cookieSameSite,  // ✅ Match cookie creation settings
+        path: '/'
     });
     
     console.log('✅ User logged out, HTTP-only cookie cleared and session invalidated');
