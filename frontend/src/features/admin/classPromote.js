@@ -120,27 +120,33 @@ const ClassPromote = () => {
 
   const handlePromoteStudents = async () => {
     try {
-      let successCount = 0;
-      let failCount = 0;
+      let totalInserted = 0;
+      let totalFailed = 0;
       
       // Promote each class one by one
       for (const classGroup of studentsGroupedByClass) {
         try {
           const studentIds = classGroup.students.map(s => s.id_siswa);
           // Promote to same class in new semester
-          await adminApi.promoteStudents(studentIds, classGroup.kelas.id_kelas, toTASemesterId);
-          successCount += studentIds.length;
-          console.log(`✅ Promoted ${studentIds.length} students from ${classGroup.kelas.nama_kelas}`);
+          const response = await adminApi.promoteStudents(studentIds, classGroup.kelas.id_kelas, toTASemesterId);
+          
+          // Get actual counts from API response
+          totalInserted += response.insertedCount || 0;
+          totalFailed += response.failedCount || 0;
+          
+          console.log(`✅ Class ${classGroup.kelas.nama_kelas}: ${response.insertedCount} inserted, ${response.failedCount} failed/duplicate`);
         } catch (err) {
           console.error(`❌ Failed to promote class ${classGroup.kelas.nama_kelas}:`, err);
-          failCount += classGroup.students.length;
+          totalFailed += classGroup.students.length;
         }
       }
       
-      if (successCount > 0) {
-        showMessage(`Berhasil memindahkan ${successCount} siswa ke semester baru!${failCount > 0 ? ` (${failCount} gagal)` : ''}`, 'success');
+      if (totalInserted > 0) {
+        showMessage(`Berhasil memindahkan ${totalInserted} siswa ke semester baru!${totalFailed > 0 ? ` (${totalFailed} siswa sudah ada atau gagal)` : ''}`, 'success');
+      } else if (totalFailed > 0) {
+        showMessage(`Tidak ada siswa yang dipindahkan. ${totalFailed} siswa sudah terdaftar di semester tujuan atau gagal.`, 'warning');
       } else {
-        showMessage('Gagal memindahkan siswa. Silakan coba lagi.', 'error');
+        showMessage('Tidak ada siswa yang diproses.', 'error');
       }
       
       // Refresh data
