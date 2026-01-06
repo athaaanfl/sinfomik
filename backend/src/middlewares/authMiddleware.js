@@ -61,10 +61,15 @@ exports.verifyToken = (req, res, next) => {
                 
                 // Compare token issued-at time with last_login_timestamp
                 // If token was issued BEFORE last login, it's an old session
-                console.log(`[SESSION] Comparing - Token IAT: ${decoded.iat}, DB Timestamp: ${row.last_login_timestamp}, Diff: ${decoded.iat - row.last_login_timestamp}s`);
+                // ✅ FIX: Add tolerance untuk timing issues (allow up to 5 seconds difference)
+                const timeDifference = decoded.iat - row.last_login_timestamp;
+                const TOLERANCE_SECONDS = 5; // Allow 5 seconds tolerance for timing issues
                 
-                if (decoded.iat < row.last_login_timestamp) {
-                    console.log(`[SESSION] ❌ OLD SESSION - Token was issued before last login. Rejecting!`);
+                console.log(`[SESSION] Comparing - Token IAT: ${decoded.iat}, DB Timestamp: ${row.last_login_timestamp}, Diff: ${timeDifference}s`);
+                
+                // Token dianggap old jika issued lebih dari TOLERANCE_SECONDS sebelum last_login
+                if (timeDifference < -TOLERANCE_SECONDS) {
+                    console.log(`[SESSION] ❌ OLD SESSION - Token was issued ${Math.abs(timeDifference)}s before last login. Rejecting!`);
                     return res.status(401).json({ 
                         message: 'This session has been logged out. You logged in from another device. Please login again.',
                         requiresAuth: true,
@@ -72,7 +77,7 @@ exports.verifyToken = (req, res, next) => {
                     });
                 }
                 
-                console.log(`[SESSION] ✓ Valid session - Token is latest`);
+                console.log(`[SESSION] ✓ Valid session - Token is current (within tolerance)`);
                 // Token is valid and latest session
                 req.user = {
                     id: decoded.id,
