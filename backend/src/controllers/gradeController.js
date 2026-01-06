@@ -181,10 +181,12 @@ exports.exportGradeTemplate = async (req, res) => {
         
         // 🆕 Get manual TP from database and merge with ATP TP
         try {
-            // Get id_penugasan first
-            const penugasanRow = await new Promise((resolve, reject) => {
+            console.log('🔍 Export Template - Checking manual TP for:', { id_guru, id_mapel, id_kelas, id_ta_semester });
+            
+            // Check if guru-mapel-kelas assignment exists
+            const assignmentExists = await new Promise((resolve, reject) => {
                 db.get(
-                    `SELECT id_penugasan FROM penugasan 
+                    `SELECT id_guru, id_mapel, id_kelas, id_ta_semester FROM gurumatapelajarankelas 
                      WHERE id_guru = ? AND id_mapel = ? AND id_kelas = ? AND id_ta_semester = ?`,
                     [id_guru, id_mapel, id_kelas, id_ta_semester],
                     (err, row) => {
@@ -194,14 +196,20 @@ exports.exportGradeTemplate = async (req, res) => {
                 );
             });
             
-            if (penugasanRow && penugasanRow.id_penugasan) {
+            console.log('📋 Assignment exists:', assignmentExists);
+            
+            if (assignmentExists) {
+                // Generate composite id_penugasan (same format as guruController)
+                const id_penugasan = `${id_guru}-${id_mapel}-${id_kelas}-${id_ta_semester}`;
+                console.log('🔑 Generated id_penugasan:', id_penugasan);
+                
                 // Get manual TP
                 const manualTps = await new Promise((resolve, reject) => {
                     db.all(
                         `SELECT tp_number, tp_name FROM manual_tp 
                          WHERE id_penugasan = ? AND id_ta_semester = ?
                          ORDER BY tp_number`,
-                        [penugasanRow.id_penugasan, id_ta_semester],
+                        [id_penugasan, id_ta_semester],
                         (err, rows) => {
                             if (err) reject(err);
                             else resolve(rows);
@@ -209,8 +217,12 @@ exports.exportGradeTemplate = async (req, res) => {
                     );
                 });
                 
+                console.log('📝 Manual TPs found:', manualTps ? manualTps.length : 0, manualTps);
+                
                 // Merge manual TP with ATP TP
                 if (manualTps && manualTps.length > 0) {
+                    console.log('🔄 Before merge - ATP TPs:', tpColumns.length, tpColumns);
+                    
                     // Get all TP numbers from both sources
                     const allTpNumbers = new Set();
                     for (let i = 0; i < tpColumns.length; i++) {
@@ -237,11 +249,16 @@ exports.exportGradeTemplate = async (req, res) => {
                     }
                     
                     tpColumns = mergedTpColumns;
+                    console.log(`✅ After merge - Total TPs: ${tpColumns.length}`, tpColumns);
                     console.log(`✅ Merged ${manualTps.length} manual TP with ${tpColumns.length - manualTps.length} ATP TP`);
+                } else {
+                    console.log('ℹ️ No manual TPs found to merge');
                 }
+            } else {
+                console.log('⚠️ Penugasan not found, cannot fetch manual TP');
             }
         } catch (err) {
-            console.log('⚠️ Error loading manual TP:', err.message);
+            console.log('⚠️ Error loading manual TP:', err.message, err.stack);
         }
         
         // If no TP from ATP or manual, use default
@@ -817,13 +834,13 @@ async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
 
         // 🆕 Get manual TP from database and merge
         try {
-            // Get id_penugasan first
-            const penugasanRow = await new Promise((resolve, reject) => {
+            console.log('🔍 getTpListDirect - Checking manual TP for:', { id_mapel, id_kelas, semesterText });
+            
+            // Get id_ta_semester first to build composite key
+            const taSemesterRow = await new Promise((resolve, reject) => {
                 db.get(
-                    `SELECT p.id_penugasan FROM penugasan p
-                     WHERE p.id_mapel = ? AND p.id_kelas = ?
-                     LIMIT 1`,
-                    [id_mapel, id_kelas],
+                    `SELECT id_ta_semester FROM tahunajaransemester WHERE semester = ?`,
+                    [semesterText],
                     (err, row) => {
                         if (err) reject(err);
                         else resolve(row);
@@ -831,12 +848,17 @@ async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
                 );
             });
             
-            if (penugasanRow && penugasanRow.id_penugasan) {
-                // Get id_ta_semester matching the semester
-                const taSemesterRow = await new Promise((resolve, reject) => {
+            console.log('📅 getTpListDirect - TA Semester found:', taSemesterRow);
+            
+            if (taSemesterRow) {
+                // Check if guru-mapel-kelas assignment exists (need id_guru from somewhere)
+                // Since we don't have id_guru in getTpListDirect params, we need to get ANY guru for this mapel-kelas
+                const assignmentRow = await new Promise((resolve, reject) => {
                     db.get(
-                        `SELECT id_ta_semester FROM tahunajaransemester WHERE semester = ?`,
-                        [semesterText],
+                        `SELECT id_guru, id_mapel, id_kelas, id_ta_semester FROM gurumatapelajarankelas
+                         WHERE id_mapel = ? AND id_kelas = ? AND id_ta_semester = ?
+                         LIMIT 1`,
+                        [id_mapel, id_kelas, taSemesterRow.id_ta_semester],
                         (err, row) => {
                             if (err) reject(err);
                             else resolve(row);
@@ -844,14 +866,20 @@ async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
                     );
                 });
                 
-                if (taSemesterRow) {
+                console.log('📋 getTpListDirect - Assignment found:', assignmentRow);
+                
+                if (assignmentRow) {
+                    // Generate composite id_penugasan
+                    const id_penugasan = `${assignmentRow.id_guru}-${assignmentRow.id_mapel}-${assignmentRow.id_kelas}-${assignmentRow.id_ta_semester}`;
+                    console.log('🔑 getTpListDirect - Generated id_penugasan:', id_penugasan);
+                    
                     // Get manual TP
                     const manualTps = await new Promise((resolve, reject) => {
                         db.all(
                             `SELECT tp_number, tp_name FROM manual_tp 
                              WHERE id_penugasan = ? AND id_ta_semester = ?
                              ORDER BY tp_number`,
-                            [penugasanRow.id_penugasan, taSemesterRow.id_ta_semester],
+                            [id_penugasan, taSemesterRow.id_ta_semester],
                             (err, rows) => {
                                 if (err) reject(err);
                                 else resolve(rows);
@@ -859,8 +887,12 @@ async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
                         );
                     });
                     
+                    console.log('📝 getTpListDirect - Manual TPs found:', manualTps ? manualTps.length : 0, manualTps);
+                    
                     // Merge manual TP with ATP result
                     if (manualTps && manualTps.length > 0) {
+                        console.log('🔄 getTpListDirect - Before merge - ATP TPs:', tpList.length);
+                        
                         // Get all TP numbers
                         const allTpNumbers = new Set();
                         for (let i = 0; i < tpList.length; i++) {
@@ -901,13 +933,19 @@ async function getTpListDirect(db, id_mapel, fase, id_kelas, semesterText) {
                             }
                         }
                         
-                        console.log(`✅ getTpListDirect: Merged ${manualTps.length} manual TP with ${tpList.length} ATP TP, total: ${mergedResult.length}`);
+                        console.log(`✅ getTpListDirect: After merge - Total ${mergedResult.length} TPs (${manualTps.length} manual + ${tpList.length} ATP)`);
                         return mergedResult;
+                    } else {
+                        console.log('ℹ️ getTpListDirect - No manual TPs to merge');
                     }
+                } else {
+                    console.log('⚠️ getTpListDirect - Assignment not found');
                 }
+            } else {
+                console.log('⚠️ getTpListDirect - TA Semester not found');
             }
         } catch (err) {
-            console.log('⚠️ Error loading manual TP in getTpListDirect:', err.message);
+            console.log('⚠️ Error loading manual TP in getTpListDirect:', err.message, err.stack);
         }
 
         return tpList;
