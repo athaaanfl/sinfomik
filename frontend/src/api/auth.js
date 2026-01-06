@@ -2,11 +2,16 @@
 // Fungsi untuk melakukan panggilan API ke backend
 
 // Pastikan untuk mengganti ini dengan URL backend Node.js Anda
-// Jika Anda menjalankan backend secara lokal, ini mungkin 'http://localhost:5000'
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+// ✅ Azure Production: gunakan backend URL yang benar
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 
+                     (window.location.hostname === 'localhost' 
+                       ? 'http://localhost:5000' 
+                       : 'https://YOUR-BACKEND-APP.azurewebsites.net'); // ⚠️ GANTI dengan URL backend Azure Anda!
 
 export const loginUser = async (username, password, userType) => {
   try {
+    console.log('🌐 API Base URL:', API_BASE_URL);
+    console.log('🔗 Login endpoint:', `${API_BASE_URL}/api/auth/login`);
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       credentials: 'include', // ✅ Penting! Mengirim dan menerima HTTP-only cookies
