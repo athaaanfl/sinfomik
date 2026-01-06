@@ -45,6 +45,14 @@ html, body, #root {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 9999;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    /* ✅ SAFEGUARDS: Prevent sidebar from being hidden accidentally */
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    /* Ensure sidebar is always on top */
+    will-change: transform, width;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 .app-sidebar.collapsed {

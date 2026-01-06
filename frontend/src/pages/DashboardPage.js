@@ -42,17 +42,67 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
         return false;
     });
     
-    // ✅ FIX: Sidebar default open di laptop (width >= 768px)
+    // ✅ FIX: Sidebar default open di laptop (width >= 768px) dengan localStorage persistence
     const [isSidebarOpen, setSidebarOpen] = useState(() => {
         if (typeof window !== 'undefined') {
-            const isMobileDevice = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const isSmallScreen = window.innerWidth < 768;
-            return !(isMobileDevice || isSmallScreen); // Open jika bukan mobile
+            try {
+                // Cek user preference dari localStorage
+                const savedPreference = localStorage.getItem('sidebar-open-preference');
+                
+                const isMobileDevice = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const isSmallScreen = window.innerWidth < 768;
+                const isMobileNow = isMobileDevice || isSmallScreen;
+                
+                // Di mobile: selalu closed
+                // Di desktop: gunakan preference jika ada, default open
+                if (isMobileNow) {
+                    return false;
+                } else {
+                    return savedPreference !== null ? savedPreference === 'true' : true;
+                }
+            } catch (e) {
+                console.warn('localStorage not available:', e);
+                // Fallback: mobile = closed, desktop = open
+                const isMobileDevice = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const isSmallScreen = window.innerWidth < 768;
+                return !(isMobileDevice || isSmallScreen);
+            }
         }
         return true;
     });
-    const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
+    
+    const [isSidebarCollapsed, setSidebarCollapsed] = useState(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const savedCollapsed = localStorage.getItem('sidebar-collapsed');
+                return savedCollapsed === 'true';
+            } catch (e) {
+                return false;
+            }
+        }
+        return false;
+    });
 
+    // ✅ Persist sidebar state ke localStorage
+    useEffect(() => {
+        try {
+            if (!isMobile) {
+                // Hanya simpan preference di desktop mode
+                localStorage.setItem('sidebar-open-preference', String(isSidebarOpen));
+            }
+        } catch (e) {
+            console.warn('Cannot save sidebar preference:', e);
+        }
+    }, [isSidebarOpen, isMobile]);
+    
+    useEffect(() => {
+        try {
+            localStorage.setItem('sidebar-collapsed', String(isSidebarCollapsed));
+        } catch (e) {
+            console.warn('Cannot save collapsed state:', e);
+        }
+    }, [isSidebarCollapsed]);
+    
     // ✅ FIX: Handle resize dengan breakpoint yang tepat (768px)
     useEffect(() => {
         const handleResize = () => {
@@ -136,7 +186,10 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
         // Choose initial menu item based on role and superadmin flag (avoid showing hidden items to non-superadmin admins)
         let initialKey = '';
         if (userRole === 'admin') {
-            const visible = isSuperAdmin ? adminMenuItems : adminMenuItems.filter(item => ['analytics','manajemen-cp'].includes(item.key));
+            // ✅ Admin non-superadmin dapat akses: analytics, CP, penugasan siswa & guru ke kelas
+            const visible = isSuperAdmin ? adminMenuItems : adminMenuItems.filter(item => 
+                ['analytics', 'manajemen-cp', 'penugasan-siswa-kelas', 'penugasan-guru-mapel-kelas'].includes(item.key)
+            );
             initialKey = visible[0]?.key || '';
         } else if (userRole === 'guru') {
             initialKey = guruMenuItems[0]?.key;
@@ -154,7 +207,10 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
         }
     };    const renderContentComponent = () => {
         // Determine visible items for the current user (same logic as sidebar)
-        const visibleItems = userRole === 'admin' ? (isSuperAdmin ? adminMenuItems : adminMenuItems.filter(item => ['analytics','manajemen-cp'].includes(item.key))) : userRole === 'guru' ? guruMenuItems : siswaMenuItems;
+        // ✅ Admin non-superadmin dapat akses: analytics, CP, penugasan siswa & guru ke kelas
+        const visibleItems = userRole === 'admin' ? (isSuperAdmin ? adminMenuItems : adminMenuItems.filter(item => 
+            ['analytics', 'manajemen-cp', 'penugasan-siswa-kelas', 'penugasan-guru-mapel-kelas'].includes(item.key)
+        )) : userRole === 'guru' ? guruMenuItems : siswaMenuItems;
 
         // Find selected item among visible items; fall back to first visible item if needed
         let selectedItem = visibleItems.find(item => item.key === activeMenuItem);
@@ -179,8 +235,11 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
         return <ActiveComponent {...componentProps} />;
     };
 
-    // If user is admin but NOT superadmin, show limited admin menu (only analytics & CP)
-    const adminVisibleItems = isSuperAdmin ? adminMenuItems : adminMenuItems.filter(item => ['analytics','manajemen-cp'].includes(item.key));
+    // If user is admin but NOT superadmin, show limited admin menu (analytics, CP, penugasan siswa & guru)
+    // ✅ Admin non-superadmin dapat akses: analytics, CP, penugasan siswa & guru ke kelas
+    const adminVisibleItems = isSuperAdmin ? adminMenuItems : adminMenuItems.filter(item => 
+        ['analytics', 'manajemen-cp', 'penugasan-siswa-kelas', 'penugasan-guru-mapel-kelas'].includes(item.key)
+    );
     const menuItems = userRole === 'admin' ? adminVisibleItems : userRole === 'guru' ? guruMenuItems : siswaMenuItems;
 
     return (
