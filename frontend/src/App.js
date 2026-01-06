@@ -86,6 +86,7 @@
       // Fungsi untuk menangani login
       // Tambahkan parameter 'id' untuk userId and roleName for superadmin flag
       const handleLogin = (role, name, id, roleName) => {
+        console.log('🔄 handleLogin called with:', { role, name, id, roleName });
         setIsLoggedIn(true);
         setUserRole(role);
         setUsername(name);
@@ -97,6 +98,7 @@
         localStorage.setItem('username', name);
         localStorage.setItem('userId', id); // Simpan userId di localStorage
         localStorage.setItem('isSuperAdmin', roleName === 'superadmin' ? 'true' : 'false');
+        console.log('✅ handleLogin completed, isLoggedIn set to true, role:', role);
       };
 
       // Fungsi untuk menangani logout

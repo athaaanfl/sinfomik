@@ -37,21 +37,33 @@ function LoginPage({ onLogin }) {
 
     try {
       const response = await loginUser(username, password, userType);
+      console.log('🔍 Login response:', response);
+      
       if (response.success) {
+        console.log('✅ Login success, user data:', response.user);
         setMessage(response.message);
         setMessageType('success');
-        // Panggil fungsi onLogin dari App.js untuk memperbarui state login
-        // PASTIKAN respons.user.id DIKIRIMKAN KE onLogin
+        
+        // Validate user data before calling onLogin
+        if (!response.user || !response.user.type || !response.user.username || !response.user.id) {
+          console.error('❌ Invalid user data in response:', response.user);
+          setMessage('Error: Data pengguna tidak valid. Silakan hubungi admin.');
+          setMessageType('error');
+          return;
+        }
+        
         // Save isSuperAdmin in localStorage and pass role info to App
         localStorage.setItem('isSuperAdmin', response.user && response.user.role === 'superadmin' ? 'true' : 'false');
+        console.log('🔄 Calling onLogin with:', response.user.type, response.user.username, response.user.id, response.user.role);
         onLogin(response.user.type, response.user.username, response.user.id, response.user.role);
         // Navigasi akan ditangani oleh App.js melalui Navigate component
       } else {
+        console.log('❌ Login failed:', response.message);
         setMessage(response.message);
         setMessageType('error');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       setMessage('Tidak dapat terhubung ke server.');
       setMessageType('error');
     }
