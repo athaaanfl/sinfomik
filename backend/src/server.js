@@ -45,7 +45,17 @@ app.use(helmet({
 // In development, allow localhost:3000
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production' 
-        ? [FRONTEND_URL, 'https://*.azurewebsites.net', 'https://*.azurestaticapps.net', 'https://sinfomik-backend-gzcng8eucydhgucz.southeastasia-01.azurewebsites.net', 'https://salmon-glacier-082ece600.3.azurestaticapps.net'] // Allow Azure domains
+        ? [
+            FRONTEND_URL, 
+            'https://*.azurewebsites.net', 
+            'https://*.azurestaticapps.net', 
+            'https://sinfomik-backend-gzcng8eucydhgucz.southeastasia-01.azurewebsites.net', 
+            'https://salmon-glacier-082ece600.3.azurestaticapps.net',
+            'https://sinfokas.online', // ✅ VM domain
+            'http://sinfokas.online',  // ✅ HTTP fallback (if needed)
+            'https://34.123.111.227',  // ✅ IP address (optional)
+            'http://34.123.111.227'    // ✅ IP HTTP (optional)
+        ]
         : ['http://localhost:3000', 'http://localhost:3001'], // Development
     credentials: true,
     exposedHeaders: ['Content-Disposition']
