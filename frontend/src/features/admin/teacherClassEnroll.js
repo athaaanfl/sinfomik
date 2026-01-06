@@ -259,7 +259,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
                         </span>
                       )}
                     </div>
-                    <p className="text-white/80 text-sm">ID: {group.teacher.id_guru}</p>
+                    <p className="text-white/80 text-sm">NIP: {group.teacher.id_guru}</p>
                   </div>
                 </div>
                 <div className="bg-white/20 px-3 py-1 rounded-full">
@@ -568,7 +568,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
                         type="text" 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search assignments..." 
+                        placeholder="Cari Penugasan..." 
                         className="w-full sm:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                       />
                       <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
@@ -640,8 +640,8 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
                         </span>
                       )}
                     </div>
-                    <p className="text-white/80">Teacher ID: {selectedTeacherDetail.teacher.id_guru}</p>
-                    <p className="text-white/80">Total Assignments: {selectedTeacherDetail.assignments.length}</p>
+                    <p className="text-white/80">NIP: {selectedTeacherDetail.teacher.id_guru}</p>
+                    <p className="text-white/80">Total Penugasan: {selectedTeacherDetail.assignments.length}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -667,7 +667,7 @@ const TeacherClassEnroll = ({ activeTASemester }) => {
             <div className="flex-1 overflow-auto p-6">
               <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                 <i className="fas fa-list-ul mr-2 text-emerald-500"></i>
-                Subject-Class Assignments
+                Penugasan Mata Pelajaran dan Kelas
               </h3>
               
               <div className="space-y-4">

@@ -327,7 +327,7 @@ const KelasManagement = ({ activeTASemester }) => {
               value={newKelasName}
               onChange={(e) => setNewKelasName(e.target.value)}
               required
-              placeholder="Contoh: 10 IPA 1"
+              placeholder="Contoh: 1 Darehdeh"
             />
           </div>
 

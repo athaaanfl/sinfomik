@@ -1029,7 +1029,7 @@ const CapaianPembelajaranManagement = () => {
                                             size="sm"
                                             onClick={() => handleViewAtpClick(mapel.id_mapel, fase, mapel.nama_mapel)}
                                           >
-                                            View ATP
+                                            Lihat ATP
                                           </Button>
                                           <Button
                                             variant="primary"

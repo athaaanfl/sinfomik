@@ -84,7 +84,7 @@ const preprocessExcelFile = async (file) => {
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       if (Array.isArray(row) && row.length >= 2) {
-        const hasNisn = row.some(cell => cell && String(cell).toUpperCase().includes('NIS'));
+        const hasNisn = row.some(cell => cell && String(cell).toUpperCase().includes('NISN'));
         const hasNama = row.some(cell => cell && String(cell).toUpperCase().includes('NAMA'));
         if (hasNisn && hasNama) { headerRowIndex = i; break; }
       }
@@ -219,7 +219,7 @@ const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseSta
           <div className="form-group">
             <label>
               <i className="fas fa-id-card mr-2 text-gray-500"></i>
-              NIS - Tidak dapat diubah
+              NISN - Tidak dapat diubah
             </label>
             <input 
               type="text" 
@@ -553,7 +553,7 @@ const StudentManagement = () => {
         </h4>
         <form onSubmit={handleAddStudent} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-group">
-              <label>NIS</label>
+              <label>NISN</label>
               <input 
                 type="number" 
                 value={newStudent.id_siswa}
@@ -642,7 +642,7 @@ const StudentManagement = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari NIS atau Nama..."
+              placeholder="Cari NISN atau Nama..."
               className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2 px-3 border transition-colors duration-200"
             />
             {searchTerm && (
@@ -669,7 +669,7 @@ const StudentManagement = () => {
                 columns={[
                   { 
                     key: 'id_siswa', 
-                    label: 'NIS', 
+                    label: 'NISN', 
                     sortable: true,
                     render: (value) => (
                       <span className="font-mono font-semibold text-gray-900">{value}</span>
@@ -802,7 +802,7 @@ const StudentManagement = () => {
       <ConfirmDialog
         isOpen={deleteConfirm.show}
         title="Hapus Siswa"
-        message={`Apakah Anda yakin ingin menghapus siswa ${deleteConfirm.student?.nama_siswa} (NIS: ${deleteConfirm.student?.id_siswa})? Data yang sudah dihapus tidak dapat dikembalikan.`}
+        message={`Apakah Anda yakin ingin menghapus siswa ${deleteConfirm.student?.nama_siswa} (NISN: ${deleteConfirm.student?.id_siswa})? Data yang sudah dihapus tidak dapat dikembalikan.`}
         confirmText="Ya, Hapus"
         cancelText="Batal"
         variant="danger"

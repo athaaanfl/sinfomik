@@ -53,11 +53,14 @@ exports.login = (req, res) => {
             }
             
             // Set JWT token sebagai HTTP-only cookie (XSS protection)
+            // ✅ iOS Safari compatibility fix
             res.cookie('authToken', token, {
                 httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
                 secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // CSRF protection
-                maxAge: 5 * 60 * 60 * 1000  // 5 hours (sesuai JWT_EXPIRES_IN)
+                sameSite: 'lax',     // ✅ Changed: 'lax' works better for iOS Safari
+                maxAge: 5 * 60 * 60 * 1000,  // 5 hours (sesuai JWT_EXPIRES_IN)
+                path: '/',           // ✅ Added: Explicit path for better compatibility
+                domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined // ✅ Added: Domain control
             });
             
             res.status(200).json({
@@ -195,11 +198,14 @@ exports.login = (req, res) => {
                 }
                 
                 // Set JWT token sebagai HTTP-only cookie (XSS protection)
+                // ✅ iOS Safari compatibility fix
                 res.cookie('authToken', token, {
                     httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
                     secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
-                    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // CSRF protection
-                    maxAge: 5 * 60 * 60 * 1000  // 5 hours (sesuai JWT_EXPIRES_IN)
+                    sameSite: 'lax',     // ✅ Changed: 'lax' works better for iOS Safari
+                    maxAge: 5 * 60 * 60 * 1000,  // 5 hours (sesuai JWT_EXPIRES_IN)
+                    path: '/',           // ✅ Added: Explicit path for better compatibility
+                    domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined // ✅ Added: Domain control
                 });
                 
                 res.status(200).json({
@@ -277,11 +283,13 @@ exports.logout = (req, res) => {
     }
     
     // Clear the HTTP-only cookie
+    // ✅ iOS Safari compatibility fix
     res.clearCookie('authToken', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        path: '/'
+        sameSite: 'lax',  // ✅ Changed: Match cookie creation settings
+        path: '/',
+        domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined
     });
     
     console.log('✅ User logged out, HTTP-only cookie cleared and session invalidated');

@@ -75,7 +75,7 @@ const EditTeacherModal = ({ teacher, onClose, onSave }) => {
           <div className="form-group">
             <label>
               <i className="fas fa-id-badge mr-2 text-gray-500"></i>
-              ID Guru - Tidak dapat diubah
+              NIP Guru - Tidak dapat diubah
             </label>
             <input 
               type="text" 
@@ -308,7 +308,7 @@ const GuruManagement = ({ isSuperAdmin = false }) => {
       <FormSection title="Tambah Guru Baru" icon="user-plus" variant="success">
         <form onSubmit={handleAddTeacher} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="form-group">
-            <label>ID Guru (NIP)</label>
+            <label>NIP Guru</label>
             <input
               type="text"
               value={newTeacher.id_guru}

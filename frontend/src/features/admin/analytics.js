@@ -354,7 +354,7 @@ const AdminAnalytics = () => {
     // Load student analytics
     const loadStudentAnalytics = async () => {
         if (!studentId) {
-            setError('Masukkan ID Siswa');
+            setError('Masukkan NISN Siswa');
             return;
         }
         
@@ -1068,7 +1068,7 @@ const AdminAnalytics = () => {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     <i className="fas fa-id-card mr-2 text-purple-500"></i>
-                                    ID Siswa
+                                    NISN Siswa
                                 </label>
                                 <input
                                     type="number"
@@ -1119,7 +1119,7 @@ const AdminAnalytics = () => {
                                         <h3 className="text-xl font-bold text-gray-800">{studentData.student.nama_siswa}</h3>
                                         <p className="text-sm text-gray-600">
                                             <i className="fas fa-id-badge mr-2"></i>
-                                            ID: {studentData.student.id_siswa} | 
+                                            NISN: {studentData.student.id_siswa} | 
                                             <i className="fas fa-calendar ml-3 mr-2"></i>
                                             Angkatan: {studentData.student.tahun_ajaran_masuk}
                                         </p>

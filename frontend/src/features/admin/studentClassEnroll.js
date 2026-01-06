@@ -342,7 +342,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="text-sm font-medium text-gray-900 truncate">{student.nama_siswa}</h4>
-          <p className="text-xs text-gray-500">NIS: {student.id_siswa}</p>
+          <p className="text-xs text-gray-500">NISN: {student.id_siswa}</p>
         </div>
       </div>
       {isSelected && (
@@ -378,7 +378,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
       </div>
       <div className="flex-1">
         <h4 className="text-sm font-medium text-gray-900">{student.nama_siswa}</h4>
-        <p className="text-xs text-gray-500">NIS: {student.id_siswa}</p>
+        <p className="text-xs text-gray-500">NISN: {student.id_siswa}</p>
       </div>
       {isSelected && (
         <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
@@ -391,7 +391,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
   const enrolledStudentsColumns = [
     { 
       key: 'id_siswa', 
-      label: 'NIS',
+      label: 'NISN',
       render: (value) => <span className="font-medium">{value}</span>
     },
     { 
@@ -412,7 +412,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
       render: () => (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
           <i className="fas fa-check-circle mr-1"></i>
-          Enrolled
+          Ditugaskan
         </span>
       )
     }
@@ -538,7 +538,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <i className="fas fa-file-excel text-green-600 mr-2 text-xl"></i>
-                  Import Enrollment dari Excel
+                  Import Penugasan Siswa dari Excel
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Button
@@ -580,7 +580,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
                 </div>
                 <p className="text-sm text-gray-600 mt-3">
                   <i className="fas fa-info-circle mr-1"></i>
-                  Download template, isi NIS dan Nama Kelas, lalu upload untuk enroll otomatis ke semester aktif
+                  Download template, isi NISN dan Nama Kelas, lalu upload untuk enroll otomatis ke semester aktif
                 </p>
                 {importErrors && importErrors.length > 0 && (
                   <div className="mt-3 bg-red-50 border border-red-200 rounded p-3">
@@ -676,8 +676,8 @@ const StudentClassEnroll = ({ activeTASemester }) => {
                 ) : (
                   <EmptyState
                     icon="user-slash"
-                    title="No Students Enrolled"
-                    message="This class has no students enrolled for the active semester."
+                    title="Tidak Ada Siswa Terdaftar"
+                    message="Kelas ini tidak memiliki siswa yang terdaftar untuk semester aktif."
                   />
                 )}
               </div>
@@ -699,7 +699,7 @@ const StudentClassEnroll = ({ activeTASemester }) => {
                         type="text" 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Cari Siswa or NIS..." 
+                        placeholder="Cari Siswa atau NISN..." 
                         className="w-full sm:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                       <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
@@ -850,11 +850,11 @@ const StudentClassEnroll = ({ activeTASemester }) => {
                 ) : (
                   <EmptyState
                     icon="user-check"
-                    title={searchTerm ? 'No Students Match Search' : 'All Students Enrolled'}
+                    title={searchTerm ? 'Tidak ada siswa yang cocok dengan pencarian' : 'Semua Siswa Telah Ditugaskan'}
                     message={
                       searchTerm 
-                        ? `No available students match your search for "${searchTerm}".`
-                        : 'All students are already enrolled in this class or no students are available.'
+                        ? `Tidak ada siswa yang cocok dengan pencarian "${searchTerm}".`
+                        : 'Semua siswa sudah terdaftar di kelas ini atau tidak ada siswa yang tersedia.'
                     }
                   />
                 )}

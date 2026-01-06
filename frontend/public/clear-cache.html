@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sinfomik - Clear Cache Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 3rem;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #4F46E5;
+            margin-bottom: 1rem;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .subtitle {
+            color: #6B7280;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        
+        .button {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .button-primary {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            color: white;
+        }
+        
+        .button-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
+        }
+        
+        .button-secondary {
+            background: #F3F4F6;
+            color: #4B5563;
+        }
+        
+        .button-secondary:hover {
+            background: #E5E7EB;
+        }
+        
+        .status {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .status-info {
+            background: #DBEAFE;
+            color: #1E40AF;
+            border-left: 4px solid #3B82F6;
+        }
+        
+        .status-success {
+            background: #D1FAE5;
+            color: #065F46;
+            border-left: 4px solid #10B981;
+        }
+        
+        .status-warning {
+            background: #FEF3C7;
+            color: #92400E;
+            border-left: 4px solid #F59E0B;
+        }
+        
+        .status-error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border-left: 4px solid #EF4444;
+        }
+        
+        .details {
+            background: #F9FAFB;
+            border: 1px solid #E5E7EB;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .details pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .icon {
+            font-size: 1.5rem;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <span class="icon">🧹</span>
+            Cache Cleaner
+        </h1>
+        <p class="subtitle">
+            Tool ini akan membersihkan service worker cache dan browser cache yang mungkin menyebabkan masalah sidebar atau update aplikasi tidak muncul.
+        </p>
+        
+        <div id="status"></div>
+        
+        <button class="button button-primary" onclick="clearAll()">
+            <span class="icon">🚀</span>
+            Bersihkan Semua Cache
+        </button>
+        
+        <button class="button button-secondary" onclick="checkStatus()">
+            <span class="icon">🔍</span>
+            Cek Status Cache
+        </button>
+        
+        <div id="details"></div>
+    </div>
+    
+    <script>
+        let log = [];
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            log.push(`[${timestamp}] ${message}`);
+            console.log(message);
+        }
+        
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status status-${type}`;
+            statusDiv.innerHTML = message;
+        }
+        
+        function showDetails() {
+            const detailsDiv = document.getElementById('details');
+            detailsDiv.className = 'details';
+            detailsDiv.innerHTML = '<pre>' + log.join('\n') + '</pre>';
+        }
+        
+        async function clearAll() {
+            log = [];
+            showStatus('<span class="loading"></span> Membersihkan cache...', 'info');
+            
+            let success = true;
+            let message = '';
+            
+            try {
+                // 1. Unregister Service Workers
+                addLog('🔧 Memeriksa service workers...');
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    addLog(`📡 Ditemukan ${registrations.length} service worker(s)`);
+                    
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                        addLog(`✅ Service worker di-unregister: ${registration.scope}`);
+                    }
+                } else {
+                    addLog('ℹ️ Service Worker tidak didukung di browser ini');
+                }
+                
+                // 2. Clear Caches
+                addLog('🧹 Membersihkan cache storage...');
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    addLog(`💾 Ditemukan ${cacheNames.length} cache(s)`);
+                    
+                    for (let name of cacheNames) {
+                        const cache = await caches.open(name);
+                        const keys = await cache.keys();
+                        addLog(`  - ${name}: ${keys.length} file(s)`);
+                        await caches.delete(name);
+                        addLog(`  ✅ Cache "${name}" dihapus`);
+                    }
+                } else {
+                    addLog('ℹ️ Cache API tidak didukung di browser ini');
+                }
+                
+                // 3. Clear localStorage (optional - sidebar preferences)
+                addLog('🗑️ Membersihkan localStorage (optional)...');
+                try {
+                    const sidebarPref = localStorage.getItem('sidebar-open-preference');
+                    const sidebarCollapsed = localStorage.getItem('sidebar-collapsed');
+                    
+                    if (sidebarPref || sidebarCollapsed) {
+                        addLog(`  - Sidebar preference: ${sidebarPref}`);
+                        addLog(`  - Sidebar collapsed: ${sidebarCollapsed}`);
+                        
+                        // Uncomment if you want to clear sidebar preferences too
+                        // localStorage.removeItem('sidebar-open-preference');
+                        // localStorage.removeItem('sidebar-collapsed');
+                        // addLog('  ✅ Sidebar preferences dihapus');
+                        
+                        addLog('  ℹ️ Sidebar preferences dipertahankan');
+                    } else {
+                        addLog('  ℹ️ Tidak ada sidebar preferences');
+                    }
+                } catch (e) {
+                    addLog(`  ⚠️ LocalStorage error: ${e.message}`);
+                }
+                
+                // 4. Set flag
+                addLog('✅ Menyimpan flag pembersihan...');
+                localStorage.setItem('cache-cleared-version', '2.0.0');
+                localStorage.setItem('cache-cleared-date', new Date().toISOString());
+                
+                message = `
+                    ✅ <strong>Berhasil!</strong><br>
+                    Cache berhasil dibersihkan. Halaman akan di-reload dalam 3 detik...<br>
+                    <small>Jika masalah masih ada, coba hard refresh (Ctrl+Shift+R)</small>
+                `;
+                showStatus(message, 'success');
+                
+                addLog('🔄 Reloading halaman...');
+                showDetails();
+                
+                setTimeout(() => {
+                    window.location.href = window.location.origin;
+                }, 3000);
+                
+            } catch (error) {
+                success = false;
+                message = `
+                    ❌ <strong>Error!</strong><br>
+                    ${error.message}<br>
+                    <small>Silakan coba manual: F12 → Application → Clear Storage</small>
+                `;
+                showStatus(message, 'error');
+                addLog(`❌ Error: ${error.message}`);
+                showDetails();
+            }
+        }
+        
+        async function checkStatus() {
+            log = [];
+            showStatus('🔍 Memeriksa status...', 'info');
+            
+            try {
+                // Check Service Workers
+                addLog('=== SERVICE WORKERS ===');
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    addLog(`📡 Service Workers: ${registrations.length}`);
+                    
+                    if (registrations.length > 0) {
+                        registrations.forEach((reg, i) => {
+                            addLog(`  ${i + 1}. Scope: ${reg.scope}`);
+                            addLog(`     State: ${reg.active?.state || 'N/A'}`);
+                        });
+                    } else {
+                        addLog('  ✅ Tidak ada service worker aktif');
+                    }
+                } else {
+                    addLog('  ℹ️ Service Worker tidak didukung');
+                }
+                
+                // Check Caches
+                addLog('\n=== CACHE STORAGE ===');
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    addLog(`💾 Total Cache: ${cacheNames.length}`);
+                    
+                    if (cacheNames.length > 0) {
+                        for (let name of cacheNames) {
+                            const cache = await caches.open(name);
+                            const keys = await cache.keys();
+                            addLog(`  - ${name}: ${keys.length} file(s)`);
+                        }
+                    } else {
+                        addLog('  ✅ Tidak ada cache');
+                    }
+                } else {
+                    addLog('  ℹ️ Cache API tidak didukung');
+                }
+                
+                // Check LocalStorage
+                addLog('\n=== LOCAL STORAGE ===');
+                try {
+                    const clearedVersion = localStorage.getItem('cache-cleared-version');
+                    const clearedDate = localStorage.getItem('cache-cleared-date');
+                    const sidebarPref = localStorage.getItem('sidebar-open-preference');
+                    const sidebarCollapsed = localStorage.getItem('sidebar-collapsed');
+                    
+                    addLog(`  Cache Cleared Version: ${clearedVersion || 'Never'}`);
+                    addLog(`  Cache Cleared Date: ${clearedDate ? new Date(clearedDate).toLocaleString() : 'Never'}`);
+                    addLog(`  Sidebar Open Pref: ${sidebarPref || 'Not set'}`);
+                    addLog(`  Sidebar Collapsed: ${sidebarCollapsed || 'Not set'}`);
+                } catch (e) {
+                    addLog(`  ⚠️ Error: ${e.message}`);
+                }
+                
+                // Check Browser Info
+                addLog('\n=== BROWSER INFO ===');
+                addLog(`  User Agent: ${navigator.userAgent.substring(0, 80)}...`);
+                addLog(`  Viewport: ${window.innerWidth}x${window.innerHeight}`);
+                addLog(`  Device Pixel Ratio: ${window.devicePixelRatio}`);
+                addLog(`  Online: ${navigator.onLine}`);
+                
+                showStatus('✅ Status berhasil dicek. Lihat detail di bawah.', 'success');
+                showDetails();
+                
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                addLog(`❌ Error: ${error.message}`);
+                showDetails();
+            }
+        }
+        
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            addLog('🚀 Cache Cleaner Tool loaded');
+            addLog('ℹ️ Klik "Cek Status Cache" untuk melihat kondisi saat ini');
+        });
+    </script>
+</body>
+</html>
