@@ -45,45 +45,50 @@ exports.login = (req, res) => {
             ? `UPDATE Admin SET last_login_timestamp = $1 WHERE id_admin = $2`
             : `UPDATE Guru SET last_login_timestamp = $1 WHERE id_guru = $2`;
 
-        db.run(updateQuery, [issuedAt, authId], function(err) {
-            if (err) {
-                console.error('Failed to update last_login_timestamp:', err);
-            } else {
-                console.log(`✅ Session initialized for admin (source=${authSource}): ${displayName} at timestamp ${issuedAt}`);
-            }
-            
-            // ✅ Clear old cookie first to prevent conflicts
-            res.clearCookie('authToken', {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                path: '/'
-            });
-            
-            // Set JWT token sebagai HTTP-only cookie (XSS protection)
-            // ✅ iOS Safari compatibility fix
-            res.cookie('authToken', token, {
-                httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
-                secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
-                sameSite: 'lax',     // ✅ Changed: 'lax' works better for iOS Safari
-                maxAge: 5 * 60 * 60 * 1000,  // 5 hours (sesuai JWT_EXPIRES_IN)
-                path: '/',           // ✅ Added: Explicit path for better compatibility
-                domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined // ✅ Added: Domain control
-            });
-            
-            res.status(200).json({
-                success: true,
-                message: 'Login berhasil!',
-                user: {
-                    id: authId,
-                    username: displayName,
-                    type: 'admin',
-                    role: roleForToken || 'admin',
-                    auth_source: authSource,
-                    auth_id: authId
+        // ✅ Convert to Promise to ensure DB update completes BEFORE sending response
+        await new Promise((resolve, reject) => {
+            db.run(updateQuery, [issuedAt, authId], function(err) {
+                if (err) {
+                    console.error('Failed to update last_login_timestamp:', err);
+                    reject(err);
+                } else {
+                    console.log(`✅ Session initialized for admin (source=${authSource}): ${displayName} at timestamp ${issuedAt}`);
+                    resolve();
                 }
-                // Token tidak dikirim di response body untuk keamanan
             });
+        });
+        
+        // ✅ Clear old cookie first to prevent conflicts
+        res.clearCookie('authToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/'
+        });
+        
+        // Set JWT token sebagai HTTP-only cookie (XSS protection)
+        // ✅ iOS Safari compatibility fix
+        res.cookie('authToken', token, {
+            httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
+            secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
+            sameSite: 'lax',     // ✅ Changed: 'lax' works better for iOS Safari
+            maxAge: 5 * 60 * 60 * 1000,  // 5 hours (sesuai JWT_EXPIRES_IN)
+            path: '/',           // ✅ Added: Explicit path for better compatibility
+            domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined // ✅ Added: Domain control
+        });
+        
+        res.status(200).json({
+            success: true,
+            message: 'Login berhasil!',
+            user: {
+                id: authId,
+                username: displayName,
+                type: 'admin',
+                role: roleForToken || 'admin',
+                auth_source: authSource,
+                auth_id: authId
+            }
+            // Token tidak dikirim di response body untuk keamanan
         });
     };
 
@@ -198,43 +203,48 @@ exports.login = (req, res) => {
             const issuedAt = decoded.iat;
 
             // Update guru last_login_timestamp
-            db.run("UPDATE Guru SET last_login_timestamp = $1 WHERE id_guru = $2", [issuedAt, user.id_guru], function(err) {
-                if (err) {
-                    console.error('Failed to update last_login_timestamp:', err);
-                } else {
-                    console.log(`✅ Session initialized for guru: ${user.nama_guru} at timestamp ${issuedAt}`);
-                }
-                
-                // ✅ Clear old cookie first to prevent conflicts
-                res.clearCookie('authToken', {
-                    httpOnly: true,
-                    secure: process.env.NODE_ENV === 'production',
-                    sameSite: 'lax',
-                    path: '/'
-                });
-                
-                // Set JWT token sebagai HTTP-only cookie (XSS protection)
-                // ✅ iOS Safari compatibility fix
-                res.cookie('authToken', token, {
-                    httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
-                    secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
-                    sameSite: 'lax',     // ✅ Changed: 'lax' works better for iOS Safari
-                    maxAge: 5 * 60 * 60 * 1000,  // 5 hours (sesuai JWT_EXPIRES_IN)
-                    path: '/',           // ✅ Added: Explicit path for better compatibility
-                    domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined // ✅ Added: Domain control
-                });
-                
-                res.status(200).json({
-                    success: true,
-                    message: 'Login berhasil! (guru)',
-                    user: {
-                        id: user.id_guru,
-                        username: user.nama_guru,
-                        type: 'guru',
-                        is_admin: !!user.is_admin
+            // ✅ Convert to Promise to ensure DB update completes BEFORE sending response
+            await new Promise((resolve, reject) => {
+                db.run("UPDATE Guru SET last_login_timestamp = $1 WHERE id_guru = $2", [issuedAt, user.id_guru], function(err) {
+                    if (err) {
+                        console.error('Failed to update last_login_timestamp:', err);
+                        reject(err);
+                    } else {
+                        console.log(`✅ Session initialized for guru: ${user.nama_guru} at timestamp ${issuedAt}`);
+                        resolve();
                     }
-                    // Token tidak dikirim di response body untuk keamanan
                 });
+            });
+            
+            // ✅ Clear old cookie first to prevent conflicts
+            res.clearCookie('authToken', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                path: '/'
+            });
+            
+            // Set JWT token sebagai HTTP-only cookie (XSS protection)
+            // ✅ iOS Safari compatibility fix
+            res.cookie('authToken', token, {
+                httpOnly: true,      // Tidak bisa diakses via JavaScript (XSS protection)
+                secure: process.env.NODE_ENV === 'production', // Hanya HTTPS di production
+                sameSite: 'lax',     // ✅ Changed: 'lax' works better for iOS Safari
+                maxAge: 5 * 60 * 60 * 1000,  // 5 hours (sesuai JWT_EXPIRES_IN)
+                path: '/',           // ✅ Added: Explicit path for better compatibility
+                domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined // ✅ Added: Domain control
+            });
+            
+            res.status(200).json({
+                success: true,
+                message: 'Login berhasil! (guru)',
+                user: {
+                    id: user.id_guru,
+                    username: user.nama_guru,
+                    type: 'guru',
+                    is_admin: !!user.is_admin
+                }
+                // Token tidak dikirim di response body untuk keamanan
             });
         });
     }
