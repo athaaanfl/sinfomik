@@ -52,6 +52,14 @@ exports.login = (req, res) => {
                 console.log(`✅ Session initialized for admin (source=${authSource}): ${displayName} at timestamp ${issuedAt}`);
             }
             
+            // ✅ Clear old cookie first to prevent conflicts
+            res.clearCookie('authToken', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                path: '/'
+            });
+            
             // Set JWT token sebagai HTTP-only cookie (XSS protection)
             // ✅ iOS Safari compatibility fix
             res.cookie('authToken', token, {
@@ -196,6 +204,14 @@ exports.login = (req, res) => {
                 } else {
                     console.log(`✅ Session initialized for guru: ${user.nama_guru} at timestamp ${issuedAt}`);
                 }
+                
+                // ✅ Clear old cookie first to prevent conflicts
+                res.clearCookie('authToken', {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'lax',
+                    path: '/'
+                });
                 
                 // Set JWT token sebagai HTTP-only cookie (XSS protection)
                 // ✅ iOS Safari compatibility fix

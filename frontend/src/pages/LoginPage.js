@@ -68,8 +68,8 @@ function LoginPage({ onLogin }) {
   };
 
   return (
-    <div className="bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 min-h-screen flex items-center justify-center p-4 animate-fadeIn">
-      <div className="container mx-auto px-4">
+    <div className="bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 min-h-screen flex items-center justify-center p-4 animate-fadeIn overflow-x-auto overflow-y-auto">
+      <div className="container mx-auto px-4 min-w-[320px]">
         <div className="max-w-5xl mx-auto">
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {/* Left Side - Hero Image */}
