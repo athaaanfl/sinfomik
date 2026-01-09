@@ -776,7 +776,16 @@ exports.importStudents = async (req, res) => {
                     break;
                 }
             }
- (NISN is stored as TEXT)
+
+            if (!tahunAjaranMasuk) {
+                // Fallback: derive first year from active TA semester (e.g., '2024/2025' -> '2024')
+                const m = (activeTASemesterTahun || '').toString().match(/(\d{4})/);
+                tahunAjaranMasuk = m ? m[1] : activeTASemesterTahun;
+            }
+
+            try {
+                await new Promise((resolve, reject) => {
+                    // Check if student already exists (NISN is stored as TEXT)
                     db.get('SELECT id_siswa FROM Siswa WHERE id_siswa = ?', [nisnClean], (err, existing) => {
                         if (err) return reject(err);
                         
@@ -793,16 +802,7 @@ exports.importStudents = async (req, res) => {
                                 function(err) {
                                     if (err) {
                                         results.failed++;
-                                        results.errors.push(`Gagal menambahkan ${nama} (${nisnClea
-                            // Insert new student
-                            db.run(
-                                `INSERT INTO Siswa (id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk)
-                                 VALUES (?, ?, ?, ?, ?)`,
-                                [nisn, nama, tglLahir, validJK, tahunAjaranMasuk],
-                                function(err) {
-                                    if (err) {
-                                        results.failed++;
-                                        results.errors.push(`Gagal menambahkan ${nama} (${nisn}): ${err.message}`);
+                                        results.errors.push(`Gagal menambahkan ${nama} (${nisnClean}): ${err.message}`);
                                         reject(err);
                                     } else {
                                         results.success++;
