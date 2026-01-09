@@ -56,11 +56,11 @@ exports.addStudent = (req, res) => {
     // Normalize NISN to string and trim
     const normalizedNISN = id_siswa.toString().trim();
 
-    // Validasi format NISN (10 digit angka)
-    if (!/^\d{10}$/.test(normalizedNISN)) {
+    // Validasi format NISN (minimal berisi angka, panjang bebas)
+    if (!/\d/.test(normalizedNISN)) {
         return res.status(400).json({ 
             success: false,
-            message: 'NISN harus 10 digit angka' 
+            message: 'NISN harus berisi angka' 
         });
     }
 
