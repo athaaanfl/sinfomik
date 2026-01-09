@@ -58,23 +58,46 @@ async function runMigration() {
             process.exit(0);
         }
 
-        // Step 2: Alter Siswa table
-        console.log('\n📋 Step 2: Altering Siswa table to TEXT...');
+        // Step 2: Drop foreign key constraints
+        console.log('\n📋 Step 2: Dropping foreign key constraints...');
+        
+        // Drop FK dari SiswaKelas
+        await client.query('ALTER TABLE siswakelas DROP CONSTRAINT IF EXISTS siswakelas_id_siswa_fkey');
+        console.log('✅ Dropped FK: siswakelas_id_siswa_fkey');
+        
+        // Drop FK dari Nilai
+        await client.query('ALTER TABLE nilai DROP CONSTRAINT IF EXISTS nilai_id_siswa_fkey');
+        console.log('✅ Dropped FK: nilai_id_siswa_fkey');
+        
+        // Drop FK dari SiswaCapaianPembelajaran
+        await client.query('ALTER TABLE siswacapaianpembelajaran DROP CONSTRAINT IF EXISTS siswacapaianpembelajaran_id_siswa_fkey');
+        console.log('✅ Dropped FK: siswacapaianpembelajaran_id_siswa_fkey');
+        
+        // Drop FK dari StudentClassEnrollment if exists
+        const checkEnrollmentFK = await client.query(`
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'studentclassenrollment' 
+            AND constraint_type = 'FOREIGN KEY'
+            AND constraint_name LIKE '%id_siswa%'
+        `);
+        
+        if (checkEnrollmentFK.rows.length > 0) {
+            await client.query(`ALTER TABLE studentclassenrollment DROP CONSTRAINT IF EXISTS ${checkEnrollmentFK.rows[0].constraint_name}`);
+            console.log(`✅ Dropped FK: ${checkEnrollmentFK.rows[0].constraint_name}`);
+        }
+
+        // Step 3: Alter all tables to TEXT
+        console.log('\n📋 Step 3: Altering all tables to TEXT...');
         await client.query('ALTER TABLE siswa ALTER COLUMN id_siswa TYPE TEXT');
         console.log('✅ Siswa.id_siswa changed to TEXT');
 
-        // Step 3: Alter foreign key references
-        console.log('\n📋 Step 3: Altering foreign key tables...');
-        
-        // SiswaKelas
         await client.query('ALTER TABLE siswakelas ALTER COLUMN id_siswa TYPE TEXT');
         console.log('✅ SiswaKelas.id_siswa changed to TEXT');
         
-        // Nilai
         await client.query('ALTER TABLE nilai ALTER COLUMN id_siswa TYPE TEXT');
         console.log('✅ Nilai.id_siswa changed to TEXT');
         
-        // SiswaCapaianPembelajaran
         await client.query('ALTER TABLE siswacapaianpembelajaran ALTER COLUMN id_siswa TYPE TEXT');
         console.log('✅ SiswaCapaianPembelajaran.id_siswa changed to TEXT');
         
@@ -90,8 +113,41 @@ async function runMigration() {
             console.log('✅ StudentClassEnrollment.id_siswa changed to TEXT');
         }
 
-        // Step 4: Verify migration
-        console.log('\n📋 Step 4: Verifying migration...');
+        // Step 4: Recreate foreign key constraints
+        console.log('\n📋 Step 4: Recreating foreign key constraints...');
+        
+        await client.query(`
+            ALTER TABLE siswakelas 
+            ADD CONSTRAINT siswakelas_id_siswa_fkey 
+            FOREIGN KEY (id_siswa) REFERENCES siswa(id_siswa) ON DELETE CASCADE
+        `);
+        console.log('✅ Recreated FK: siswakelas_id_siswa_fkey');
+        
+        await client.query(`
+            ALTER TABLE nilai 
+            ADD CONSTRAINT nilai_id_siswa_fkey 
+            FOREIGN KEY (id_siswa) REFERENCES siswa(id_siswa) ON DELETE CASCADE
+        `);
+        console.log('✅ Recreated FK: nilai_id_siswa_fkey');
+        
+        await client.query(`
+            ALTER TABLE siswacapaianpembelajaran 
+            ADD CONSTRAINT siswacapaianpembelajaran_id_siswa_fkey 
+            FOREIGN KEY (id_siswa) REFERENCES siswa(id_siswa) ON DELETE CASCADE
+        `);
+        console.log('✅ Recreated FK: siswacapaianpembelajaran_id_siswa_fkey');
+        
+        if (checkEnrollment.rows.length > 0) {
+            await client.query(`
+                ALTER TABLE studentclassenrollment 
+                ADD CONSTRAINT studentclassenrollment_id_siswa_fkey 
+                FOREIGN KEY (id_siswa) REFERENCES siswa(id_siswa) ON DELETE CASCADE
+            `);
+            console.log('✅ Recreated FK: studentclassenrollment_id_siswa_fkey');
+        }
+
+        // Step 5: Verify migration
+        console.log('\n📋 Step 5: Verifying migration...');
         const verifyTables = ['siswa', 'siswakelas', 'nilai', 'siswacapaianpembelajaran'];
         
         for (const table of verifyTables) {
