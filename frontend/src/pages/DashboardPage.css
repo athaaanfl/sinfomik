@@ -141,8 +141,7 @@ html, body, #root {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 1rem 0;
-    /* Add padding bottom to prevent content from being hidden behind logout button */
-    padding-bottom: 5rem;
+    /* Remove extra padding - logout button is now in flow */
 }
 
 .sidebar-content::-webkit-scrollbar {
@@ -209,11 +208,10 @@ html, body, #root {
     box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
-/* Logout Button - Fixed at bottom */
+/* Logout Button - Scroll to bottom to see */
 .logout-btn {
-    position: sticky;
-    bottom: 0;
-    margin: 0 1rem 1rem;
+    position: relative;
+    margin: 1rem;
     padding: 0.875rem;
     background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
     border: none;
@@ -227,7 +225,6 @@ html, body, #root {
     justify-content: center;
     box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
     flex-shrink: 0;
-    z-index: 10;
 }
 
 .logout-btn i {
@@ -383,6 +380,35 @@ html, body, #root {
     box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
 }
 
+/* Mobile Logout Button - Top Right */
+.mobile-logout-btn {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10000;
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    border: none;
+    color: white;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+    transition: all 0.3s ease;
+}
+
+.mobile-logout-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+}
+
+.mobile-logout-btn:active {
+    transform: scale(0.95);
+}
+
 /* Overlay for Mobile */
 .sidebar-overlay {
     position: fixed;
@@ -406,6 +432,10 @@ html, body, #root {
 /* ✅ FIX: Mobile view (< 768px) - sidebar tersembunyi secara default */
 @media (max-width: 768px) {
     .mobile-menu-btn {
+        display: flex;
+    }
+    
+    .mobile-logout-btn {
         display: flex;
     }
 

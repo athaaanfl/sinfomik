@@ -37,17 +37,60 @@ exports.getAllStudents = (req, res) => {
 exports.addStudent = (req, res) => {
     const { id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk } = req.body;
     const db = getDb();
-//cuma ngetes aja
+
+    // Validasi input
+    if (!id_siswa || !id_siswa.toString().trim()) {
+        return res.status(400).json({ 
+            success: false,
+            message: 'NISN tidak boleh kosong' 
+        });
+    }
+
+    if (!nama_siswa || !nama_siswa.trim()) {
+        return res.status(400).json({ 
+            success: false,
+            message: 'Nama siswa tidak boleh kosong' 
+        });
+    }
+
+    // Normalize NISN to string and trim
+    const normalizedNISN = id_siswa.toString().trim();
+
+    // Validasi format NISN (10 digit angka)
+    if (!/^\d{10}$/.test(normalizedNISN)) {
+        return res.status(400).json({ 
+            success: false,
+            message: 'NISN harus 10 digit angka' 
+        });
+    }
+
     db.run("INSERT INTO siswa (id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk) VALUES (?, ?, ?, ?, ?)",
-        [id_siswa, nama_siswa, tanggal_lahir || null, jenis_kelamin || null, tahun_ajaran_masuk || null],
+        [normalizedNISN, nama_siswa.trim(), tanggal_lahir?.trim() || null, jenis_kelamin || null, tahun_ajaran_masuk || null],
         function(err) {
             if (err) {
+                console.error('Error adding student:', err.message);
                 if (err.message.includes('UNIQUE constraint failed')) {
-                    return res.status(409).json({ message: 'ID Siswa sudah ada.' });
+                    return res.status(409).json({ 
+                        success: false,
+                        message: `Siswa dengan NISN ${normalizedNISN} sudah terdaftar` 
+                    });
                 }
-                return res.status(400).json({ message: err.message });
+                return res.status(500).json({ 
+                    success: false,
+                    message: `Gagal menambahkan siswa: ${err.message}` 
+                });
             }
-            res.status(201).json({ message: 'Siswa berhasil ditambahkan', id: this.lastID });
+
+            // Success response
+            res.status(201).json({ 
+                success: true,
+                message: `Siswa ${nama_siswa} berhasil ditambahkan`, 
+                data: {
+                    id: this.lastID,
+                    id_siswa: normalizedNISN,
+                    nama_siswa: nama_siswa.trim()
+                }
+            });
         }
     );
 };
@@ -56,13 +99,51 @@ exports.updateStudent = (req, res) => {
     const { id } = req.params;
     const { nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk } = req.body;
     const db = getDb();
+
+    // Validasi input
+    if (!id || !id.toString().trim()) {
+        return res.status(400).json({ 
+            success: false,
+            message: 'NISN tidak valid' 
+        });
+    }
+
+    if (!nama_siswa || !nama_siswa.trim()) {
+        return res.status(400).json({ 
+            success: false,
+            message: 'Nama siswa tidak boleh kosong' 
+        });
+    }
+
+    const normalizedNISN = id.toString().trim();
     const query = "UPDATE siswa SET nama_siswa = ?, tanggal_lahir = ?, jenis_kelamin = ?, tahun_ajaran_masuk = ? WHERE id_siswa = ?";
-    const params = [nama_siswa, tanggal_lahir || null, jenis_kelamin || null, tahun_ajaran_masuk || null, id];
+    const params = [nama_siswa.trim(), tanggal_lahir?.trim() || null, jenis_kelamin || null, tahun_ajaran_masuk || null, normalizedNISN];
 
     db.run(query, params, function(err) {
-        if (err) return res.status(400).json({ message: err.message });
-        if (this.changes === 0) return res.status(404).json({ message: 'Siswa tidak ditemukan atau tidak ada perubahan.' });
-        res.json({ message: 'Siswa berhasil diperbarui.' });
+        if (err) {
+            console.error('Error updating student:', err.message);
+            return res.status(500).json({ 
+                success: false,
+                message: `Gagal memperbarui siswa: ${err.message}` 
+            });
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({ 
+                success: false,
+                message: `Siswa dengan NISN ${normalizedNISN} tidak ditemukan` 
+            });
+        }
+
+        res.json({ 
+            success: true,
+            message: `Data siswa ${nama_siswa} berhasil diperbarui`,
+            data: {
+                id_siswa: normalizedNISN,
+                nama_siswa: nama_siswa.trim(),
+                changes: this.changes
+            }
+        });
     });
 };
 
@@ -70,26 +151,112 @@ exports.deleteStudent = (req, res) => {
     const { id } = req.params;
     const db = getDb();
 
-    db.get("SELECT COUNT(*) AS count FROM siswakelas WHERE id_siswa = ?", [id], (err, row) => {
-        if (err) return res.status(500).json({ message: err.message });
-        if (row.count > 0) {
-            return res.status(409).json({ message: 'Tidak dapat menghapus siswa. Siswa masih terdaftar di kelas.' });
+    if (!id || !id.toString().trim()) {
+        return res.status(400).json({ 
+            success: false,
+            message: 'NISN tidak valid' 
+        });
+    }
+
+    const normalizedNISN = id.toString().trim();
+
+    // Check if student has enrollments
+    db.get("SELECT COUNT(*) AS count FROM siswakelas WHERE id_siswa = ?", [normalizedNISN], (err, row) => {
+        if (err) {
+            console.error('Error checking student enrollments:', err.message);
+            return res.status(500).json({ 
+                success: false,
+                message: `Gagal memeriksa data siswa: ${err.message}` 
+            });
         }
-        db.get("SELECT COUNT(*) AS count FROM nilai WHERE id_siswa = ?", [id], (err, row) => {
-            if (err) return res.status(500).json({ message: err.message });
-            if (row.count > 0) {
-                return res.status(409).json({ message: 'Tidak dapat menghapus siswa. Siswa masih memiliki data nilai.' });
+
+        if (row.count > 0) {
+            return res.status(409).json({ 
+                success: false,
+                message: `Tidak dapat menghapus siswa dengan NISN ${normalizedNISN}. Siswa masih terdaftar di ${row.count} kelas. Hapus terlebih dahulu dari kelas.` 
+            });
+        }
+
+        // Check if student has grades
+        db.get("SELECT COUNT(*) AS count FROM nilai WHERE id_siswa = ?", [normalizedNISN], (err, row) => {
+            if (err) {
+                console.error('Error checking student grades:', err.message);
+                return res.status(500).json({ 
+                    success: false,
+                    message: `Gagal memeriksa data nilai: ${err.message}` 
+                });
             }
-            db.get("SELECT COUNT(*) AS count FROM siswacapaianpembelajaran WHERE id_siswa = ?", [id], (err, row) => {
-                if (err) return res.status(500).json({ message: err.message });
-                if (row.count > 0) {
-                    return res.status(409).json({ message: 'Tidak dapat menghapus siswa. Siswa masih memiliki data capaian pembelajaran.' });
+
+            if (row.count > 0) {
+                return res.status(409).json({ 
+                    success: false,
+                    message: `Tidak dapat menghapus siswa dengan NISN ${normalizedNISN}. Siswa memiliki ${row.count} data nilai. Hapus terlebih dahulu data nilai.` 
+                });
+            }
+
+            // Check if student has learning achievements
+            db.get("SELECT COUNT(*) AS count FROM siswacapaianpembelajaran WHERE id_siswa = ?", [normalizedNISN], (err, row) => {
+                if (err) {
+                    console.error('Error checking student achievements:', err.message);
+                    return res.status(500).json({ 
+                        success: false,
+                        message: `Gagal memeriksa data capaian: ${err.message}` 
+                    });
                 }
 
-                db.run("DELETE FROM siswa WHERE id_siswa = ?", [id], function(err) {
-                    if (err) return res.status(400).json({ message: err.message });
-                    if (this.changes === 0) return res.status(404).json({ message: 'Siswa tidak ditemukan.' });
-                    res.json({ message: 'Siswa berhasil dihapus.' });
+                if (row.count > 0) {
+                    return res.status(409).json({ 
+                        success: false,
+                        message: `Tidak dapat menghapus siswa dengan NISN ${normalizedNISN}. Siswa memiliki ${row.count} data capaian pembelajaran. Hapus terlebih dahulu data capaian.` 
+                    });
+                }
+
+                // Get student name before deleting
+                db.get("SELECT nama_siswa FROM siswa WHERE id_siswa = ?", [normalizedNISN], (err, student) => {
+                    if (err) {
+                        console.error('Error fetching student:', err.message);
+                        return res.status(500).json({ 
+                            success: false,
+                            message: `Gagal mengambil data siswa: ${err.message}` 
+                        });
+                    }
+
+                    if (!student) {
+                        return res.status(404).json({ 
+                            success: false,
+                            message: `Siswa dengan NISN ${normalizedNISN} tidak ditemukan` 
+                        });
+                    }
+
+                    const studentName = student.nama_siswa;
+
+                    // All checks passed, delete student
+                    db.run("DELETE FROM siswa WHERE id_siswa = ?", [normalizedNISN], function(err) {
+                        if (err) {
+                            console.error('Error deleting student:', err.message);
+                            return res.status(500).json({ 
+                                success: false,
+                                message: `Gagal menghapus siswa: ${err.message}` 
+                            });
+                        }
+
+                        if (this.changes === 0) {
+                            return res.status(404).json({ 
+                                success: false,
+                                message: `Siswa dengan NISN ${normalizedNISN} tidak ditemukan` 
+                            });
+                        }
+
+                        res.json({ 
+                            success: true,
+                            message: `Siswa ${studentName} (NISN: ${normalizedNISN}) berhasil dihapus`,
+                            data: {
+                                id_siswa: normalizedNISN,
+                                nama_siswa: studentName,
+                                changes: this.changes
+                            }
+                        });
+                    });
                 });
             });
         });

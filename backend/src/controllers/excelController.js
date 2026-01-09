@@ -586,14 +586,15 @@ exports.exportStudentTemplate = async (req, res) => {
         // Create workbook
         const wb = xlsx.utils.book_new();
         
-        // Header columns (added 'Tahun Ajaran' which accepts single-year like 2024 or full '2024/2025')
-        const headers = ['NIS', 'Nama Siswa', 'Tanggal Lahir', 'Jenis Kelamin', 'Tahun Ajaran Masuk'];
+        // Header columns - Tempat & Tanggal Lahir digabung jadi 1 kolom text
+        const headers = ['NISN', 'Nama Siswa', 'Tempat, Tanggal Lahir', 'Jenis Kelamin', 'Tahun Ajaran Masuk'];
         
-        // Sample data for guidance (last column is Tahun Ajaran - can be '2024' or '2024/2025')
+        // Sample data for guidance - NISN bisa berbagai panjang
         const sampleData = [
-            ['1234567890', 'Budi Santoso', '2010-05-15', 'L', '2024'],
-            ['1234567891', 'Siti Nurhaliza', '2010-08-20', 'P', '2024'],
-            ['1234567892', 'Ahmad Rizki', '2010-03-12', 'L', '2024']
+            ['1234567890', 'Budi Santoso', 'Bandung, 15 Mei 2010', 'L', '2024'],
+            ['234567891', 'Siti Nurhaliza', 'Jakarta, 20 Agustus 2010', 'P', '2024'],
+            ['0234567892', 'Ahmad Rizki', 'Surabaya, 12 Maret 2010', 'L', '2024'],
+            ['12345', 'Dewi Lestari', 'Bandung, 01-01-2010', 'P', '2024']
         ];
         
         // Instructions
@@ -601,18 +602,23 @@ exports.exportStudentTemplate = async (req, res) => {
             ['TEMPLATE IMPORT DATA SISWA'],
             [''],
             ['PETUNJUK PENGISIAN:'],
-            ['1. NIS: Nomor Induk Siswa (bisa angka atau kombinasi, bebas format)'],
+            ['1. NISN: Nomor Induk Siswa Nasional (bebas panjang, bisa 9-10 digit atau lebih, leading zero akan dipertahankan)'],
             ['2. Nama Siswa: Nama lengkap siswa'],
-            ['3. Tanggal Lahir: Format YYYY-MM-DD (contoh: 2010-05-15) atau kosongkan'],
+            ['3. Tempat, Tanggal Lahir: Format bebas, contoh: "Bandung, 16 Januari 2010" atau "Jakarta, 01-01-2010" (atau kosongkan)'],
             ['4. Jenis Kelamin: L (Laki-laki) atau P (Perempuan)'],
-            ['5. Tahun Ajaran / Angkatan: Tahun tunggal (contoh: 2024) — opsional. Jika kosong, sistem akan mengisi dengan tahun TA aktif.'],
+            ['5. Tahun Ajaran Masuk: Tahun tunggal (contoh: 2024) — opsional. Jika kosong, sistem akan mengisi dengan tahun TA aktif.'],
+            [''],
+            ['CATATAN PENTING:'],
+            ['- NISN boleh berbagai panjang (tidak harus 10 digit). Jika dimulai dengan 0, pastikan diformat sebagai TEXT di Excel'],
+            ['- Tempat & Tanggal Lahir adalah field TEXT bebas, bisa ditulis dalam format apa saja'],
+            ['- Jenis Kelamin hanya menerima "L" atau "P"'],
             [''],
             ['CONTOH DATA:'],
             headers,
             ...sampleData,
             [''],
-            ['Hapus baris contoh ini dan isi dengan data siswa Anda mulai dari baris ke-11'],
-            ['Pastikan kolom NIS dan Nama Siswa tidak kosong. Tahun Ajaran dapat berupa tahun tunggal (4 digit) atau rentang (YYYY/YYYY) jika diisi.']
+            ['Hapus baris contoh ini dan isi dengan data siswa Anda mulai dari baris ke-16'],
+            ['Pastikan kolom NISN dan Nama Siswa tidak kosong.']
         ];
         
         // Create worksheet
@@ -620,11 +626,11 @@ exports.exportStudentTemplate = async (req, res) => {
         
         // Set column widths
         ws['!cols'] = [
-            { wch: 15 }, // NIS
+            { wch: 15 }, // NISN
             { wch: 30 }, // Nama Siswa
-            { wch: 15 }, // Tanggal Lahir
+            { wch: 30 }, // Tempat, Tanggal Lahir (lebih lebar karena text bebas)
             { wch: 15 }, // Jenis Kelamin
-            { wch: 12 }  // Tahun Masuk
+            { wch: 18 }  // Tahun Masuk
         ];
         
         // Add worksheet to workbook
@@ -690,7 +696,8 @@ exports.importStudents = async (req, res) => {
         
         const nisnIndex = headers.findIndex(h => h.includes('NIS'));
         const namaIndex = headers.findIndex(h => h.includes('NAMA'));
-        const tglLahirIndex = headers.findIndex(h => h.includes('TANGGAL') || h.includes('LAHIR'));
+        // Tanggal Lahir sekarang adalah text field yang bisa berisi "Tempat, Tanggal Lahir"
+        const tglLahirIndex = headers.findIndex(h => (h.includes('TEMPAT') && h.includes('TANGGAL')) || h.includes('LAHIR'));
         const jenisKelaminIndex = headers.findIndex(h => h.includes('JENIS') || h.includes('KELAMIN'));
         
         if (nisnIndex === -1 || namaIndex === -1) {
@@ -734,14 +741,22 @@ exports.importStudents = async (req, res) => {
             if (!row[nisnIndex] || !row[namaIndex]) continue;
             
             const nisn = row[nisnIndex].toString().trim();
-            const nama = row[namaIndex].toString().trim();
+            // Tanggal lahir sekarang adalah text bebas (bisa "Bandung, 16 Januari 2010" atau format lain)
             const tglLahir = tglLahirIndex !== -1 && row[tglLahirIndex] ? row[tglLahirIndex].toString().trim() : null;
             const jenisKelamin = jenisKelaminIndex !== -1 && row[jenisKelaminIndex] ? row[jenisKelaminIndex].toString().trim().toUpperCase() : 'L';
             
-            // Validate NISN (allow any format, just not empty)
-            if (!nisn || nisn.length === 0) {
+            // Validate NISN (tidak boleh kosong, minimal harus ada angka)
+            const nisnClean = nisn.replace(/\s/g, ''); // Remove spaces
+            if (!nisnClean || nisnClean.length === 0) {
                 results.failed++;
-                results.errors.push(`NIS kosong untuk siswa: ${nama}`);
+                results.errors.push(`NISN kosong untuk siswa: ${nama}`);
+                continue;
+            }
+            
+            // Validate NISN minimal berisi angka (tapi panjangnya bebas - bisa 9, 10, atau lebih)
+            if (!/\d/.test(nisnClean)) {
+                results.failed++;
+                results.errors.push(`NISN tidak valid untuk ${nama}: "${nisn}" (harus berisi angka)`);
                 continue;
             }
             
@@ -761,17 +776,8 @@ exports.importStudents = async (req, res) => {
                     break;
                 }
             }
-
-            if (!tahunAjaranMasuk) {
-                // Fallback: derive first year from active TA semester (e.g., '2024/2025' -> '2024')
-                const m = (activeTASemesterTahun || '').toString().match(/(\d{4})/);
-                tahunAjaranMasuk = m ? m[1] : activeTASemesterTahun;
-            }
-
-            try {
-                await new Promise((resolve, reject) => {
-                    // Check if student already exists
-                    db.get('SELECT id_siswa FROM Siswa WHERE id_siswa = ?', [nisn], (err, existing) => {
+ (NISN is stored as TEXT)
+                    db.get('SELECT id_siswa FROM Siswa WHERE id_siswa = ?', [nisnClean], (err, existing) => {
                         if (err) return reject(err);
                         
                         if (existing) {
@@ -779,6 +785,15 @@ exports.importStudents = async (req, res) => {
                             results.skipped++;
                             resolve();
                         } else {
+                            // Insert new student (tanggal_lahir is now TEXT)
+                            db.run(
+                                `INSERT INTO Siswa (id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk)
+                                 VALUES (?, ?, ?, ?, ?)`,
+                                [nisnClean, nama, tglLahir, validJK, tahunAjaranMasuk],
+                                function(err) {
+                                    if (err) {
+                                        results.failed++;
+                                        results.errors.push(`Gagal menambahkan ${nama} (${nisnClea
                             // Insert new student
                             db.run(
                                 `INSERT INTO Siswa (id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk)

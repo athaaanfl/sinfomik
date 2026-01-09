@@ -301,7 +301,7 @@ const MataPelajaranManagement = () => {
               value={newMapelName}
               onChange={(e) => setNewMapelName(e.target.value)}
               required
-              placeholder="Contoh: Matematika, Bahasa Indonesia, IPA"
+              placeholder="Contoh: MATEMATIKA, BAHASA INDONESIA, IPAS"
             />
           </div>
           <Button

@@ -5,6 +5,7 @@
     import DashboardPage from './pages/DashboardPage';
     import PWAInstallPrompt from './components/PWAInstallPrompt';
     import TokenExpiryWarning from './components/TokenExpiryWarning';
+    import { ToastProvider } from './context/ToastContext';
 
     function App() {
   // State untuk melacak status login pengguna
@@ -127,18 +128,19 @@
       }
 
       return (
-        <Router>
-          <Routes>
-            {/* Route untuk halaman login */}
-            <Route path="/login" element={
-              isLoggedIn ? (
-                // Jika sudah login, redirect ke dashboard yang sesuai
-                <Navigate to={`/${userRole}-dashboard`} replace />
-              ) : (
-                // Jika belum login, tampilkan halaman login
-                <LoginPage onLogin={handleLogin} />
-              )
-            } />
+        <ToastProvider>
+          <Router>
+            <Routes>
+              {/* Route untuk halaman login */}
+              <Route path="/login" element={
+                isLoggedIn ? (
+                  // Jika sudah login, redirect ke dashboard yang sesuai
+                  <Navigate to={`/${userRole}-dashboard`} replace />
+                ) : (
+                  // Jika belum login, tampilkan halaman login
+                  <LoginPage onLogin={handleLogin} />
+                )
+              } />
 
             {/* Route untuk dashboard Admin */}
             <Route path="/admin-dashboard" element={
@@ -176,6 +178,7 @@
           {/* PWA Install Prompt */}
           <PWAInstallPrompt />
         </Router>
+      </ToastProvider>
       );
     }
 

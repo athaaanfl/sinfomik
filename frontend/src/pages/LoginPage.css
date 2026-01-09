@@ -1,27 +1,59 @@
 /* Custom scrollbar for login page */
 .login-page-wrapper {
+  /* Force scrollbar styling */
   scrollbar-width: thin;
   scrollbar-color: rgba(99, 102, 241, 0.5) rgba(255, 255, 255, 0.1);
+  /* CRITICAL: Force scroll behavior */
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+  /* Ensure height constraint for scrolling */
+  height: 100vh !important;
+  max-height: 100vh !important;
+  /* Smooth scrolling */
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }
 
-/* Webkit browsers (Chrome, Safari, Edge) */
+/* Webkit browsers (Chrome, Safari, Edge) - Desktop */
 .login-page-wrapper::-webkit-scrollbar {
   width: 12px;
+  /* Always display scrollbar */
+  display: block;
 }
 
 .login-page-wrapper::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 10px;
 }
 
 .login-page-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.5);
+  background: rgba(99, 102, 241, 0.6);
   border-radius: 10px;
   border: 2px solid transparent;
   background-clip: padding-box;
+  /* Make thumb more visible */
+  min-height: 40px;
 }
 
 .login-page-wrapper::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.8);
+  background: rgba(99, 102, 241, 0.9);
   background-clip: padding-box;
+}
+
+/* Mobile scrollbar styling (for Android Chrome) */
+@media (max-width: 768px) {
+  .login-page-wrapper::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .login-page-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.7);
+    border-radius: 10px;
+  }
+  
+  /* For mobile browsers that support it */
+  .login-page-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.7) transparent;
+  }
 }

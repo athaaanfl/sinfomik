@@ -34,7 +34,7 @@ const createTablesSQL = [
     );`,
     
     `CREATE TABLE IF NOT EXISTS Siswa (
-        id_siswa INTEGER PRIMARY KEY,
+        id_siswa TEXT PRIMARY KEY,
         nama_siswa TEXT NOT NULL,
         tanggal_lahir TEXT,
         jenis_kelamin TEXT,
@@ -72,7 +72,7 @@ const createTablesSQL = [
     
     `CREATE TABLE IF NOT EXISTS SiswaKelas (
         id_siswa_kelas SERIAL PRIMARY KEY,
-        id_siswa INTEGER NOT NULL,
+        id_siswa TEXT NOT NULL,
         id_kelas INTEGER NOT NULL,
         id_ta_semester INTEGER NOT NULL,
         FOREIGN KEY (id_siswa) REFERENCES Siswa(id_siswa),
@@ -96,7 +96,7 @@ const createTablesSQL = [
     
     `CREATE TABLE IF NOT EXISTS Nilai (
         id_nilai SERIAL PRIMARY KEY,
-        id_siswa INTEGER NOT NULL,
+        id_siswa TEXT NOT NULL,
         id_guru TEXT NOT NULL,
         id_mapel INTEGER NOT NULL,
         id_kelas INTEGER NOT NULL,
@@ -126,7 +126,7 @@ const createTablesSQL = [
     
     `CREATE TABLE IF NOT EXISTS SiswaCapaianPembelajaran (
         id_siswa_cp SERIAL PRIMARY KEY,
-        id_siswa INTEGER NOT NULL,
+        id_siswa TEXT NOT NULL,
         id_cp INTEGER NOT NULL,
         id_guru TEXT NOT NULL,
         id_ta_semester INTEGER NOT NULL,
@@ -180,7 +180,7 @@ const createTablesSQL = [
     
     `CREATE TABLE IF NOT EXISTS StudentClassEnrollment (
         id_enrollment SERIAL PRIMARY KEY,
-        id_siswa INTEGER NOT NULL,
+        id_siswa TEXT NOT NULL,
         id_kelas INTEGER NOT NULL,
         id_ta_semester INTEGER NOT NULL,
         enrollment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

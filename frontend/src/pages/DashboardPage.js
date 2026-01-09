@@ -282,6 +282,18 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
             >
                 <i className="fas fa-bars"></i>
             </button>
+            
+            {/* Mobile logout button - top right */}
+            {isMobile && (
+                <button 
+                    className="mobile-logout-btn"
+                    onClick={onLogout}
+                    type="button"
+                    title="Keluar"
+                >
+                    <i className="fas fa-sign-out-alt"></i>
+                </button>
+            )}
 
             {/* Overlay untuk menutup sidebar - selalu render tapi visibility diatur CSS */}
             {isSidebarOpen && (

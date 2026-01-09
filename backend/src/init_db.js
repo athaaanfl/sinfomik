@@ -33,7 +33,7 @@ function initializeDatabase() {
         );
 
         CREATE TABLE IF NOT EXISTS Siswa (
-            id_siswa INTEGER PRIMARY KEY,
+            id_siswa TEXT PRIMARY KEY,
             nama_siswa TEXT NOT NULL,
             tanggal_lahir TEXT,
             jenis_kelamin TEXT,

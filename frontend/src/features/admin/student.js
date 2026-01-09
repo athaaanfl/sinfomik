@@ -9,6 +9,7 @@ import FormSection from '../../components/FormSection';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import StatusMessage from '../../components/StatusMessage';
+import { useToast } from '../../context/ToastContext';
 
 // --- Date helpers ---------------------------------------------------------
 // Parse flexible date strings (DD-MM-YYYY, DD/MM/YYYY, DD-MM-YY, ISO, Excel serial) into ISO YYYY-MM-DD
@@ -62,6 +63,12 @@ const parseDateFlexible = (input) => {
 // Format ISO or other inputs to display DD-MM-YYYY (for table)
 const formatDateDisplay = (input) => {
   if (!input && input !== 0) return '-';
+  
+  // If input already looks like formatted text (e.g., "Bandung, 16 Januari 2010"), return as-is
+  if (typeof input === 'string' && /[a-zA-Z]/.test(input)) {
+    return input;
+  }
+  
   const iso = parseDateFlexible(input);
   if (!iso) return String(input);
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -69,15 +76,37 @@ const formatDateDisplay = (input) => {
   return `${m[3]}-${m[2]}-${m[1]}`; // DD-MM-YYYY
 };
 
-// Preprocess Excel file to normalize Tanggal Lahir to ISO YYYY-MM-DD when possible
+// Preprocess Excel file to normalize Tanggal Lahir to ISO YYYY-MM-DD and preserve NISN as text
 const preprocessExcelFile = async (file) => {
   try {
     const XLSX = await import('xlsx');
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    // CRITICAL: raw: false ensures numbers aren't converted automatically
+    const workbook = XLSX.read(arrayBuffer, { type: 'array', raw: false, cellText: true });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    
+    // Force NISN column to be treated as text by setting cell type
+    const range = XLSX.utils.decode_range(sheet['!ref']);
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = sheet[cellAddress];
+        if (!cell) continue;
+        
+        // Convert numeric cells to text to preserve leading zeros
+        if (cell.t === 'n' && cell.v) {
+          cell.t = 's'; // Change type to string
+          cell.v = String(cell.v); // Convert value to string
+          // Pad with leading zero if needed for NISN (10 digits)
+          if (C === 0 && cell.v.length < 10 && !isNaN(cell.v)) {
+            cell.v = cell.v.padStart(10, '0');
+          }
+        }
+      }
+    }
+    
+    const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
 
     // Find header row containing NISN and NAMA
     let headerRowIndex = -1;
@@ -92,13 +121,26 @@ const preprocessExcelFile = async (file) => {
     if (headerRowIndex === -1) return file;
 
     const headers = data[headerRowIndex].map(h => h ? String(h).toUpperCase() : '');
+    const nisnIndex = headers.findIndex(h => h.includes('NISN') || h.includes('NIS'));
     const tglIndex = headers.findIndex(h => h.includes('TANGGAL') || h.includes('LAHIR'));
-    if (tglIndex === -1) return file;
 
     const rows = data.slice();
     for (let r = headerRowIndex + 1; r < rows.length; r++) {
       const row = rows[r];
       if (!row || row.length === 0) continue;
+      
+      // Process NISN: ensure it's text and preserve leading zeros
+      if (nisnIndex !== -1 && row[nisnIndex] !== undefined && row[nisnIndex] !== null && row[nisnIndex] !== '') {
+        let nisn = String(row[nisnIndex]).trim();
+        // Pad with leading zeros if NISN is less than 10 digits and numeric
+        if (!isNaN(nisn) && nisn.length < 10) {
+          nisn = nisn.padStart(10, '0');
+        }
+        row[nisnIndex] = nisn;
+      }
+      
+      // Process Tanggal Lahir
+      if (tglIndex === -1) continue;
       const cell = row[tglIndex];
       if (cell === undefined || cell === null || cell === '') continue;
 
@@ -132,10 +174,8 @@ const preprocessExcelFile = async (file) => {
 };
 
 // Komponen Modal Edit Siswa
-const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseStartYear }) => {
+const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseStartYear, toast }) => {
   const [editedStudent, setEditedStudent] = useState({ ...student });
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Initialize tahun_ajaran_masuk as single-year if available, or fallback to active TA start year
@@ -149,10 +189,9 @@ const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseSta
       setEditedStudent(prev => ({ ...prev, tahun_ajaran_masuk: prev.tahun_ajaran_masuk || defaultYear }));
     }
 
-    // Normalize tanggal_lahir for date input (ensure ISO YYYY-MM-DD)
+    // Normalize tanggal_lahir for text input (just use as-is)
     if (student && student.tanggal_lahir) {
-      const iso = parseDateFlexible(student.tanggal_lahir) || student.tanggal_lahir;
-      setEditedStudent(prev => ({ ...prev, tanggal_lahir: iso }));
+      setEditedStudent(prev => ({ ...prev, tanggal_lahir: student.tanggal_lahir }));
     }
   }, [student, taSemesters, parseStartYear]);
 
@@ -163,31 +202,42 @@ const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseSta
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
-    setMessageType('');
     setIsSubmitting(true);
+
+    // Validasi frontend
+    if (!editedStudent.nama_siswa || !editedStudent.nama_siswa.trim()) {
+      toast.error('Nama siswa tidak boleh kosong');
+      setIsSubmitting(false);
+      return;
+    }empat_lahir: editedStudent.tempat_lahir?.trim() || null,
+        t
     
     try {
       const dataToUpdate = {
-        nama_siswa: editedStudent.nama_siswa,
-        tanggal_lahir: parseDateFlexible(editedStudent.tanggal_lahir) || editedStudent.tanggal_lahir,
+        nama_siswa: editedStudent.nama_siswa.trim(),
+        tanggal_lahir: editedStudent.tanggal_lahir?.trim() || null,
         jenis_kelamin: editedStudent.jenis_kelamin,
         // Store single-year format (e.g., '2024')
         tahun_ajaran_masuk: editedStudent.tahun_ajaran_masuk || null
       };
       
       const response = await adminApi.updateStudent(editedStudent.id_siswa, dataToUpdate);
-      setMessage(response.message);
-      setMessageType('success');
+      
+      if (response.success === false) {
+        toast.error(response.message || 'Gagal memperbarui siswa');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      toast.success(response.message || `Data siswa ${editedStudent.nama_siswa} berhasil diperbarui`);
       
       setTimeout(() => {
         onSave();
         onClose();
-      }, 1000);
+      }, 500);
     } catch (err) {
-      setMessage(err.message);
-      setMessageType('error');
-    } finally {
+      console.error('Error updating student:', err);
+      toast.error(err.message || 'Terjadi kesalahan saat memperbarui siswa');
       setIsSubmitting(false);
     }
   };
@@ -207,13 +257,6 @@ const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseSta
             <i className="fas fa-times text-xl"></i>
           </button>
         </div>
-        
-        {message && (
-          <div className={`message ${messageType}`}>
-            <i className={`fas ${messageType === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
-            {message}
-          </div>
-        )}
         
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="form-group">
@@ -243,15 +286,17 @@ const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseSta
           </div>
           <div className="form-group">
             <label>
-              <i className="fas fa-calendar mr-2 text-gray-500"></i>
-              Tanggal Lahir
+              <i className="fas fa-map-marker-alt mr-2 text-gray-500"></i>
+              Tempat, Tanggal Lahir
             </label>
             <input
-              type="date"
+              type="text"
               name="tanggal_lahir"
-              value={editedStudent.tanggal_lahir}
+              value={editedStudent.tanggal_lahir || ''}
               onChange={handleChange}
+              placeholder="Contoh: Bandung, 16 Januari 2010"
             />
+            <small className="text-gray-500 mt-1 block">Format bebas: Tempat, Tanggal Lahir</small>
           </div>
           <div className="form-group">
             <label>
@@ -328,6 +373,9 @@ const StudentManagement = () => {
     tahun_ajaran_masuk: '' // will hold single-year like '2024'
   });
 
+  // Use toast context
+  const { toast } = useToast();
+
   // Helper: parse first 4-digit year from '2024/2025' or other formats
   const parseStartYear = (s) => {
     if (!s) return '';
@@ -385,42 +433,57 @@ const StudentManagement = () => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const showMessage = (text, type = 'success') => {
-    setMessage(text);
-    setMessageType(type);
-    
-    // Hide message after 5 seconds
-    setTimeout(() => {
-      setMessage('');
-      setMessageType('');
-    }, 5000);
-  };
-
   const handleAddStudent = async (e) => {
     e.preventDefault();
     setMessage('');
     setMessageType('');
     
+    // Validasi frontend
     if (!newStudent.id_siswa.trim()) {
-      showMessage('Student ID must be filled', 'error');
+      toast.error('NISN tidak boleh kosong');
+      return;
+    }
+
+    if (!newStudent.nama_siswa.trim()) {
+      toast.error('Nama siswa tidak boleh kosong');
+      return;
+    }
+
+    // Validasi format NISN (minimal berisi angka, panjang bebas)
+    if (!/\d/.test(newStudent.id_siswa.trim())) {
+      toast.error('NISN harus berisi angka');
       return;
     }
     
     try {
       const { id_siswa, nama_siswa, tanggal_lahir, jenis_kelamin, tahun_ajaran_masuk } = newStudent;
-      const tanggalIso = parseDateFlexible(tanggal_lahir) || tanggal_lahir || null;
-      const response = await adminApi.addStudent({ id_siswa, nama_siswa, tanggal_lahir: tanggalIso, jenis_kelamin, tahun_ajaran_masuk });
-      showMessage(response.message);
+      const response = await adminApi.addStudent({ 
+        id_siswa: id_siswa.trim(), 
+        nama_siswa: nama_siswa.trim(),
+        tanggal_lahir: tanggal_lahir?.trim() || null,
+        jenis_kelamin, 
+        tahun_ajaran_masuk 
+      });
+
+      // Check backend response
+      if (response.success === false) {
+        toast.error(response.message || 'Gagal menambahkan siswa');
+        return;
+      }
+
+      toast.success(response.message || `Siswa ${nama_siswa} berhasil ditambahkan`);
+      
       setNewStudent({
         id_siswa: '',
         nama_siswa: '',
         tanggal_lahir: '',
         jenis_kelamin: 'L',
-        tahun_ajaran_masuk: activeTASemester?.tahun_ajaran || ''
+        tahun_ajaran_masuk: parseStartYear(activeTASemester?.tahun_ajaran || '')
       });
       fetchStudents(); // Refresh daftar
     } catch (err) {
-      showMessage(err.message, 'error');
+      console.error('Error adding student:', err);
+      toast.error(err.message || 'Terjadi kesalahan saat menambahkan siswa');
     }
   };
 
@@ -440,10 +503,17 @@ const StudentManagement = () => {
     setMessageType('');
     try {
       const response = await adminApi.deleteStudent(deleteConfirm.student.id_siswa);
-      showMessage(response.message);
+      
+      if (response.success === false) {
+        toast.error(response.message || 'Gagal menghapus siswa');
+        return;
+      }
+      
+      toast.success(response.message || `Siswa ${deleteConfirm.student.nama_siswa} berhasil dihapus`);
       fetchStudents();
     } catch (err) {
-      showMessage(err.message, 'error');
+      console.error('Error deleting student:', err);
+      toast.error(err.message || 'Terjadi kesalahan saat menghapus siswa');
     } finally {
       setDeleteConfirm({ show: false, student: null });
     }
@@ -452,9 +522,10 @@ const StudentManagement = () => {
   const handleDownloadTemplate = async () => {
     try {
       await adminApi.downloadStudentTemplate();
-      showMessage('✅ Template berhasil diunduh!');
+      toast.success('Template berhasil diunduh!');
     } catch (err) {
-      showMessage(`❌ Gagal download template: ${err.message}`, 'error');
+      console.error('Error downloading template:', err);
+      toast.error(`Gagal download template: ${err.message}`);
     }
   };
 
@@ -463,7 +534,7 @@ const StudentManagement = () => {
     if (!file) return;
 
     setIsImporting(true);
-    showMessage('⏳ Mengupload dan memproses file...', 'info');
+    toast.info('Mengupload dan memproses file...', 'Import Excel');
 
     try {
       // Preprocess Excel to normalize date columns (if possible)
@@ -471,14 +542,18 @@ const StudentManagement = () => {
       const result = await adminApi.importStudents(processedFile);
       
       if (result.details && result.details.errors && result.details.errors.length > 0) {
-        showMessage(`⚠️ ${result.message}\nError: ${result.details.errors.slice(0, 3).join(', ')}`, 'warning');
+        const errorMsg = result.details.errors.slice(0, 3).join(', ');
+        toast.warning(`${result.message}. Error: ${errorMsg}`, 'Import Selesai dengan Peringatan');
+      } else if (result.success === false) {
+        toast.error(result.message || 'Gagal import data siswa');
       } else {
-        showMessage(`✅ ${result.message}`);
+        toast.success(result.message || 'Data siswa berhasil diimport');
       }
       
       fetchStudents(); // Refresh list
     } catch (err) {
-      showMessage(`❌ ${err.message}`, 'error');
+      console.error('Error importing excel:', err);
+      toast.error(err.message || 'Terjadi kesalahan saat import Excel');
     } finally {
       setIsImporting(false);
       event.target.value = ''; // Reset file input
@@ -555,11 +630,12 @@ const StudentManagement = () => {
             <div className="form-group">
               <label>NISN</label>
               <input 
-                type="number" 
+                type="text" 
                 value={newStudent.id_siswa}
                 onChange={(e) => setNewStudent({ ...newStudent, id_siswa: e.target.value })}
                 required
-                placeholder="Contoh: 1234567890"
+                placeholder="Contoh: 1234567890 atau 0213456789 atau 12345"
+                title="NISN berisi angka (panjang bebas)"
               />
             </div>
             <div className="form-group">
@@ -573,12 +649,14 @@ const StudentManagement = () => {
               />
             </div>
             <div className="form-group">
-              <label>Tanggal Lahir</label>
+              <label>Tempat, Tanggal Lahir</label>
               <input 
-                type="date" 
+                type="text" 
                 value={newStudent.tanggal_lahir}
                 onChange={(e) => setNewStudent({ ...newStudent, tanggal_lahir: e.target.value })}
+                placeholder="Contoh: Bandung, 16 Januari 2010"
               />
+              <small className="text-gray-500 mt-1 block">Format bebas: Tempat, Tanggal Lahir</small>
             </div>
             <div className="form-group">
               <label>Jenis Kelamin</label>
@@ -662,10 +740,10 @@ const StudentManagement = () => {
         {error && (
           <StatusMessage type="error" message={`Error: ${error}`} autoClose={false} />
         )}
-        
+
         {!loading && !error && (
-          <div className="space-y-4">
-            <Table
+          <Table
+                data={displayedStudents}
                 columns={[
                   { 
                     key: 'id_siswa', 
@@ -685,7 +763,7 @@ const StudentManagement = () => {
                   },
                   { 
                     key: 'tanggal_lahir', 
-                    label: 'Tanggal Lahir', 
+                    label: 'Tempat, Tanggal Lahir', 
                     sortable: true,
                     render: (value) => (
                       <span className="text-gray-700">{formatDateDisplay(value)}</span>
@@ -707,16 +785,6 @@ const StudentManagement = () => {
                     )
                   }
                 ]}
-                // Apply client-side search filter then paginate
-            data={(
-              students
-                .filter(s => {
-                  const q = searchTerm.trim().toLowerCase();
-                  if (!q) return true;
-                  return (s.id_siswa && String(s.id_siswa).toLowerCase().includes(q)) || (s.nama_siswa && s.nama_siswa.toLowerCase().includes(q));
-                })
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-            )}
                 emptyMessage="Belum ada siswa terdaftar"
                 actions={(student) => (
                   <div className="flex flex-col sm:flex-row gap-2">
@@ -739,9 +807,10 @@ const StudentManagement = () => {
                   </div>
                 )}
             />
+        )}
 
-            {/* Pagination */}
-            { (students.filter(s => {
+        {/* Pagination */}
+        { !loading && !error && (students.filter(s => {
                   const q = searchTerm.trim().toLowerCase();
                   if (!q) return true;
                   return (s.id_siswa && String(s.id_siswa).toLowerCase().includes(q)) || (s.nama_siswa && s.nama_siswa.toLowerCase().includes(q));
@@ -785,8 +854,6 @@ const StudentManagement = () => {
                 </div>
               </div>
             )}
-          </div>
-        )}
       </div>
 
       {showEditModal && selectedStudent && (
@@ -796,6 +863,7 @@ const StudentManagement = () => {
           onSave={fetchStudents}
           taSemesters={taSemesters}
           parseStartYear={parseStartYear}
+          toast={toast}
         />
       )}
 
