@@ -981,20 +981,10 @@ exports.importEnrollment = async (req, res) => {
             console.log(`[IMPORT-ENROLL] Processing row: NIS='${nisn}', Kelas='${namaKelas}'`);
             try {
                 await new Promise((resolve, reject) => {
-                    // Check if student exists
+                    // Check if student exists (id_siswa is TEXT)
                     const nisnClean = nisn.trim();
-                    // Try numeric lookup first (id_siswa int), fall back to string compare
-                    const tryNumeric = /^[0-9]+$/.test(nisnClean);
-                    const checkStudent = (cb) => {
-                        if (tryNumeric) {
-                            db.get('SELECT id_siswa FROM Siswa WHERE id_siswa = ?', [parseInt(nisnClean)], cb);
-                        } else {
-                            // Fallback to text compare
-                            db.get('SELECT id_siswa FROM Siswa WHERE LOWER(CAST(id_siswa AS TEXT)) = LOWER(?)', [nisnClean], cb);
-                        }
-                    };
-
-                    checkStudent((err, siswa) => {
+                    
+                    db.get('SELECT id_siswa FROM Siswa WHERE id_siswa = ?', [nisnClean], (err, siswa) => {
                         if (err) return reject(err);
                         
                             if (!siswa) {
