@@ -494,10 +494,10 @@ exports.importGradesFromExcel = async (req, res) => {
             
             if (!idSiswa) continue; // Skip empty rows
             
-            // Verify student exists
+            // Verify student exists and get student name for better error messages
             const student = await new Promise((resolve, reject) => {
                 db.get(
-                    'SELECT id_siswa FROM siswa WHERE id_siswa = ?',
+                    'SELECT id_siswa, nama_siswa FROM siswa WHERE id_siswa = ?',
                     [idSiswa],
                     (err, row) => {
                         if (err) reject(err);
@@ -507,7 +507,10 @@ exports.importGradesFromExcel = async (req, res) => {
             });
             
             if (!student) {
-                errors.push(`ID Siswa ${idSiswa} tidak ditemukan`);
+                errors.push({
+                    nisn: idSiswa,
+                    error: `NISN ${idSiswa} tidak ditemukan di database siswa. Pastikan NISN sudah terdaftar.`
+                });
                 failCount++;
                 continue;
             }
@@ -521,7 +524,13 @@ exports.importGradesFromExcel = async (req, res) => {
                     const nilai = parseFloat(gradeValue);
                     
                     if (isNaN(nilai) || nilai < 0 || nilai > 100) {
-                        errors.push(`Nilai TP${tpNum} untuk ID ${idSiswa} tidak valid: ${gradeValue}`);
+                        errors.push({
+                            siswa: student.nama_siswa,
+                            nisn: idSiswa,
+                            jenis: `TP ${tpNum}`,
+                            nilai: gradeValue,
+                            error: `Nilai tidak valid (harus 0-100)`
+                        });
                         failCount++;
                         continue;
                     }
@@ -570,7 +579,13 @@ exports.importGradesFromExcel = async (req, res) => {
                         }
                         successCount++;
                     } catch (err) {
-                        errors.push(`Gagal menyimpan TP${tpNum} untuk ID ${idSiswa}: ${err.message}`);
+                        errors.push({
+                            siswa: student.nama_siswa,
+                            nisn: idSiswa,
+                            jenis: `TP ${tpNum}`,
+                            nilai: gradeValue,
+                            error: err.message
+                        });
                         failCount++;
                     }
                 }
@@ -583,7 +598,13 @@ exports.importGradesFromExcel = async (req, res) => {
                 const nilai = parseFloat(uasValue);
                 
                 if (isNaN(nilai) || nilai < 0 || nilai > 100) {
-                    errors.push(`Nilai UAS untuk ID ${idSiswa} tidak valid: ${uasValue}`);
+                    errors.push({
+                        siswa: student.nama_siswa,
+                        nisn: idSiswa,
+                        jenis: 'UAS',
+                        nilai: uasValue,
+                        error: `Nilai tidak valid (harus 0-100)`
+                    });
                     failCount++;
                     continue;
                 }
@@ -632,7 +653,13 @@ exports.importGradesFromExcel = async (req, res) => {
                     }
                     successCount++;
                 } catch (err) {
-                    errors.push(`Gagal menyimpan UAS untuk ID ${idSiswa}: ${err.message}`);
+                    errors.push({
+                        siswa: student.nama_siswa,
+                        nisn: idSiswa,
+                        jenis: 'UAS',
+                        nilai: uasValue,
+                        error: err.message
+                    });
                     failCount++;
                 }
             }
