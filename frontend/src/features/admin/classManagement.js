@@ -205,7 +205,12 @@ const KelasManagement = ({ activeTASemester }) => {
 
   // Filter available teachers for Add Kelas form (exclude teachers already assigned)
   const availableTeachersForAdd = teachers.filter(teacher => {
-    return !kelas.some(k => Number(k.id_wali_kelas) === teacher.id_guru);
+    // Check if this teacher is already assigned as wali kelas in any class
+    const isAlreadyAssigned = kelas.some(k => 
+      k.id_wali_kelas != null && // Ensure id_wali_kelas is not null/undefined
+      String(k.id_wali_kelas) === String(teacher.id_guru) // Type-safe comparison
+    );
+    return !isAlreadyAssigned;
   });
 
   const handleAddKelas = async (e) => {
