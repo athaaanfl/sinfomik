@@ -56,6 +56,23 @@ function registerValidSW(swUrl, config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
+      // Listen for SW messages (e.g., activation notice)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data && event.data.type === 'SW_ACTIVATED') {
+            // Throttle reloads to avoid loops
+            const now = Date.now();
+            const last = window.__lastSWReload || 0;
+            if (now - last > 5000) {
+              window.__lastSWReload = now;
+              window.location.reload();
+            } else {
+              console.log('⏱ Skipping rapid repeated SW reload from message');
+            }
+          }
+        });
+      }
+
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
         if (installingWorker == null) {
@@ -76,6 +93,34 @@ function registerValidSW(swUrl, config) {
               if (config && config.onUpdate) {
                 config.onUpdate(registration);
               }
+
+              // AUTO-ACTIVATE: Ask waiting worker to skipWaiting so it becomes active immediately
+              if (registration.waiting) {
+                try {
+                  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                } catch (e) {
+                  console.warn('Failed to postMessage SKIP_WAITING to service worker', e);
+                }
+              }
+
+              // Listen for controllerchange and reload the page once so the new
+              // service worker takes control and clients receive updated assets/data.
+              let refreshing = false;
+              navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                refreshing = true;
+
+                // Throttle reloads to avoid loops
+                const now = Date.now();
+                const last = window.__lastSWReload || 0;
+                if (now - last > 5000) {
+                  window.__lastSWReload = now;
+                  // Force a reload so user sees the new content immediately
+                  window.location.reload();
+                } else {
+                  console.log('⏱ Skipping rapid repeated SW reload');
+                }
+              });
             } else {
               // At this point, everything has been precached.
               // It's the perfect time to display a

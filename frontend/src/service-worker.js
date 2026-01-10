@@ -107,4 +107,20 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// Notify clients when the service worker activates so they can refresh if needed
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const allClients = await clients.matchAll({ includeUncontrolled: true });
+        for (const client of allClients) {
+          client.postMessage({ type: 'SW_ACTIVATED' });
+        }
+      } catch (e) {
+        console.warn('Error notifying clients on activate', e);
+      }
+    })()
+  );
+});
+
 // Any other custom service worker logic can go here.

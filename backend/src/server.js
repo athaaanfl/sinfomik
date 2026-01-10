@@ -91,6 +91,16 @@ const limiter = rateLimit({
 // Apply rate limiting only to API routes (avoid counting static asset reloads)
 app.use('/api', limiter);
 
+// Ensure mutating API responses are not cached by intermediaries or the browser
+app.use('/api', (req, res, next) => {
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+    }
+    next();
+});
+
 // Stricter rate limit for auth routes
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
