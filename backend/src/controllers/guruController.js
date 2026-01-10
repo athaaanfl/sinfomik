@@ -92,18 +92,14 @@ exports.addOrUpdateNewGrade = (req, res) => {
 
     // Verify student is enrolled in this class/semester
     db.get(`SELECT id_siswa FROM SiswaKelas WHERE id_siswa = ? AND id_kelas = ? AND id_ta_semester = ?`,
-            [id_siswa, id_kelas, id_ta_semester], (err, enrollRow) => {
+        [id_siswa, id_kelas, id_ta_semester], (err, enrollRow) => {
         if (err) return res.status(500).json({ message: err.message });
         if (!enrollRow) return res.status(400).json({ message: `Siswa ${id_siswa} tidak terdaftar di kelas ini untuk semester aktif.` });
 
         // Check if grade already exists
         const checkQuery = jenis_nilai === 'TP' 
-            ? `SELECT id_nilai FROM nilai 
-               WHERE id_siswa = ? AND id_guru = ? AND id_mapel = ? AND id_kelas = ?
-               AND id_ta_semester = ? AND jenis_nilai = ? AND urutan_tp = ?`
-            : `SELECT id_nilai FROM nilai 
-               WHERE id_siswa = ? AND id_guru = ? AND id_mapel = ? AND id_kelas = ?
-               AND id_ta_semester = ? AND jenis_nilai = ?`;
+            ? `SELECT id_nilai FROM nilai WHERE id_siswa = ? AND id_guru = ? AND id_mapel = ? AND id_kelas = ? AND id_ta_semester = ? AND jenis_nilai = ? AND urutan_tp = ?`
+            : `SELECT id_nilai FROM nilai WHERE id_siswa = ? AND id_guru = ? AND id_mapel = ? AND id_kelas = ? AND id_ta_semester = ? AND jenis_nilai = ?`;
 
         const checkParams = jenis_nilai === 'TP' 
             ? [id_siswa, id_guru, id_mapel, id_kelas, id_ta_semester, jenis_nilai, urutan_tp]
@@ -115,45 +111,33 @@ exports.addOrUpdateNewGrade = (req, res) => {
             if (row) {
                 // Update if already exists
                 console.log(`🔄 Updating nilai - id_nilai: ${row.id_nilai}, jenis: ${jenis_nilai}, nilai: ${nilai}`);
-                
-                db.run(`
-                    UPDATE nilai SET nilai = ?, keterangan = ?, tanggal_input = ?
-                    WHERE id_nilai = ?
-                `, [nilai, keterangan, tanggal_input, row.id_nilai], function(err) {
+
+                db.run(`UPDATE nilai SET nilai = ?, keterangan = ?, tanggal_input = ? WHERE id_nilai = ?`,
+                    [nilai, keterangan, tanggal_input, row.id_nilai], function(err) {
                     if (err) {
                         console.error('❌ Update failed:', err.message);
                         return res.status(400).json({ message: err.message });
                     }
-                    
+
                     console.log(`✅ Update success - changes: ${this.changes}`);
-                    res.status(200).json({ 
-                        message: 'Nilai berhasil diperbarui.', 
-                        id: row.id_nilai, 
-                        changes: this.changes,
-                        updated: true
-                    });
+                    return res.status(200).json({ message: 'Nilai berhasil diperbarui.', id: row.id_nilai, changes: this.changes, updated: true });
                 });
             } else {
                 // Insert if not exists
                 console.log(`➕ Inserting new nilai - jenis: ${jenis_nilai}, nilai: ${nilai}`);
-                
-                db.run(`
-                    INSERT INTO nilai (id_siswa, id_guru, id_mapel, id_kelas, id_ta_semester, jenis_nilai, urutan_tp, nilai, tanggal_input, keterangan)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `, [id_siswa, id_guru, id_mapel, id_kelas, id_ta_semester, jenis_nilai, urutan_tp, nilai, tanggal_input, keterangan], function(err) {
+
+                db.run(`INSERT INTO nilai (id_siswa, id_guru, id_mapel, id_kelas, id_ta_semester, jenis_nilai, urutan_tp, nilai, tanggal_input, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [id_siswa, id_guru, id_mapel, id_kelas, id_ta_semester, jenis_nilai, urutan_tp, nilai, tanggal_input, keterangan], function(err) {
                     if (err) {
                         console.error('❌ Insert failed:', err.message);
                         return res.status(400).json({ message: err.message });
-                }
-                
-                console.log(`✅ Insert success - id: ${this.lastID}`);
-                res.status(201).json({ 
-                    message: 'Nilai berhasil ditambahkan.', 
-                    id: this.lastID,
-                    updated: false
+                    }
+
+                    console.log(`✅ Insert success - id: ${this.lastID}`);
+                    return res.status(201).json({ message: 'Nilai berhasil ditambahkan.', id: this.lastID, updated: false });
                 });
-            });
-        }
+            }
+        });
     });
 };
 
