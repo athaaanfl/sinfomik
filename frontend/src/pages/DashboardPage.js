@@ -116,10 +116,6 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
             
             console.log('Resize detected:', {
                 width: window.innerWidth,
-                isMobileDevice,
-                isSmallScreen,
-                isIPad,
-                isIPadLandscape,
                 mobile,
                 currentSidebarOpen: isSidebarOpen
             });

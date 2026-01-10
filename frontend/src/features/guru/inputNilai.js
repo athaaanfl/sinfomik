@@ -452,11 +452,9 @@ const InputNilai = ({ activeTASemester, userId }) => {
 
   const handleSubmitGrades = async (e) => {
     e.preventDefault();
-    setMessage('');
-    setMessageType('');
+    
     if (!selectedAssignment || !activeTASemester || studentsInClass.length === 0) {
-      setMessage('Harap pilih kelas/mapel dan pastikan ada siswa.');
-      setMessageType('error');
+      toast.error('Harap pilih kelas/mapel dan pastikan ada siswa.');
       return;
     }
 
