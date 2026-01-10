@@ -105,8 +105,9 @@ export const deleteTASemester = async (id_ta_semester) => {
 };
 
 // --- API untuk Siswa ---
-export const getStudents = async () => {
-  return fetchData(`${API_BASE_URL}/api/admin/students`);
+export const getStudents = async (noCache = false) => {
+  const url = noCache ? `${API_BASE_URL}/api/admin/students?_=${Date.now()}` : `${API_BASE_URL}/api/admin/students`;
+  return fetchData(url);
 };
 
 export const addStudent = async (studentData) => {

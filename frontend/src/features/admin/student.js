@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import StatusMessage from '../../components/StatusMessage';
 import { useToast } from '../../context/ToastContext';
+import { notifyDataChange, subscribeDataChange } from '../../utils/broadcast';
 
 // --- Date helpers ---------------------------------------------------------
 // Parse flexible date strings (DD-MM-YYYY, DD/MM/YYYY, DD-MM-YY, ISO, Excel serial) into ISO YYYY-MM-DD
@@ -207,6 +208,7 @@ const EditStudentModal = ({ student, onClose, onSave, taSemesters = [], parseSta
       }
       
       toast.success(response.message || `Data siswa ${editedStudent.nama_siswa} berhasil diperbarui`);
+      try { notifyDataChange('students'); } catch(e) {}
       
       setTimeout(() => {
         onSave();
@@ -353,6 +355,21 @@ const StudentManagement = () => {
   // Use toast context
   const { toast } = useToast();
 
+  // Subscribe to cross-tab updates so we refresh automatically when other tabs mutate students
+  useEffect(() => {
+    const unsub = subscribeDataChange((msg) => {
+      try {
+        if (msg && (msg.resource === 'students' || msg.resource === undefined)) {
+          fetchStudents(true);
+        }
+      } catch (e) {
+        console.warn('subscribeDataChange handler error', e);
+      }
+    });
+
+    return () => unsub && unsub();
+  }, []);
+
   // Helper: parse first 4-digit year from '2024/2025' or other formats
   const parseStartYear = (s) => {
     if (!s) return '';
@@ -460,6 +477,9 @@ const StudentManagement = () => {
 
       toast.success(response.message || `Siswa ${nama_siswa} berhasil ditambahkan`);
       
+      // Notify other tabs and force local refresh
+      try { notifyDataChange('students'); } catch(e) {}
+
       setNewStudent({
         id_siswa: '',
         nama_siswa: '',
@@ -467,7 +487,7 @@ const StudentManagement = () => {
         jenis_kelamin: 'L',
         tahun_ajaran_masuk: parseStartYear(activeTASemester?.tahun_ajaran || '')
       });
-      fetchStudents(); // Refresh daftar
+      fetchStudents(true); // Refresh daftar (force fresh network fetch to bypass SW cache)
     } catch (err) {
       console.error('Error adding student:', err);
       toast.error(err.message || 'Terjadi kesalahan saat menambahkan siswa');
@@ -497,7 +517,8 @@ const StudentManagement = () => {
       }
       
       toast.success(response.message || `Siswa ${deleteConfirm.student.nama_siswa} berhasil dihapus`);
-      fetchStudents();
+      try { notifyDataChange('students'); } catch(e) {}
+      fetchStudents(true);
     } catch (err) {
       console.error('Error deleting student:', err);
       toast.error(err.message || 'Terjadi kesalahan saat menghapus siswa');
@@ -847,7 +868,7 @@ const StudentManagement = () => {
         <EditStudentModal
           student={selectedStudent}
           onClose={() => setShowEditModal(false)}
-          onSave={fetchStudents}
+          onSave={() => fetchStudents(true)} // force fresh fetch after edit
           taSemesters={taSemesters}
           parseStartYear={parseStartYear}
           toast={toast}

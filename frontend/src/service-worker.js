@@ -11,7 +11,7 @@ import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import { StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
+import { StaleWhileRevalidate, CacheFirst, NetworkFirst } from 'workbox-strategies';
 
 clientsClaim();
 
@@ -84,11 +84,12 @@ registerRoute(
   })
 );
 
-// Cache API requests with Stale While Revalidate for better offline experience
+// Cache API requests with NetworkFirst so fresh data is used when network is available
 registerRoute(
   ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/api/'),
-  new StaleWhileRevalidate({
+  new NetworkFirst({
     cacheName: 'api-cache',
+    networkTimeoutSeconds: 3, // fall back to cache if network is slow
     plugins: [
       new ExpirationPlugin({
         maxEntries: 50,
