@@ -25,7 +25,11 @@ const EditKelasModal = ({ kelas, onClose, onSave, teachers, allKelas }) => {
       k.id_kelas !== kelas.id_kelas && // Not the current class being edited
       k.id_wali_kelas === teacher.id_guru // Teacher is assigned to that class
     );
-    return !isAssignedElsewhere;
+    
+    // Include the teacher if:
+    // 1. Not assigned elsewhere, OR
+    // 2. Currently assigned to THIS class (so they remain selectable)
+    return !isAssignedElsewhere || teacher.id_guru === kelas.id_wali_kelas;
   });
 
   const handleChange = (e) => {
