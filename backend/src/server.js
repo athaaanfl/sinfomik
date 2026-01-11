@@ -24,6 +24,42 @@ const app = express();
 const PORT = process.env.PORT || 5000; // Gunakan port dari .env atau default 5000
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
+// Initialize Application Insights (if configured)
+const appInsights = (() => {
+  try {
+    const ai = require('applicationinsights');
+    if (process.env.APPLICATIONINSIGHTS_CONNECTION_STRING) {
+      ai.setup(process.env.APPLICATIONINSIGHTS_CONNECTION_STRING)
+        .setAutoCollectRequests(true)
+        .setAutoCollectDependencies(true)
+        .setAutoCollectPerformance(true)
+        .setAutoCollectExceptions(true)
+        .start();
+      console.log('✅ Application Insights initialized');
+    } else {
+      console.log('⚠️  APPLICATIONINSIGHTS_CONNECTION_STRING not set; skipping App Insights init');
+    }
+    return ai;
+  } catch (err) {
+    console.warn('⚠️  Application Insights not installed or failed to initialize:', err.message);
+    return null;
+  }
+})();
+
+// Annotation endpoint for load tests and quick events
+app.post('/internal/annotate', express.json(), (req, res) => {
+  const name = req.body.name || 'load_test_event';
+  const props = req.body.properties || {};
+  try {
+    if (appInsights && appInsights.defaultClient) {
+      appInsights.defaultClient.trackEvent({ name, properties: props });
+    }
+  } catch (e) {
+    console.warn('Failed to track annotate event:', e.message);
+  }
+  res.status(200).json({ ok: true });
+});
+
 // ===============================
 // TRUST PROXY (for Azure App Service)
 // ===============================
