@@ -768,7 +768,7 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="px-4 py-3 border text-left">No</th>
-                  <th className="px-4 py-3 border text-left">ID Siswa</th>
+                  <th className="px-4 py-3 border text-left">NISN</th>
                   <th className="px-4 py-3 border text-left">Nama Siswa</th>
                   <th className="px-4 py-3 border text-center">Rata-rata</th>
                   <th className="px-4 py-3 border text-center">Status</th>
@@ -928,7 +928,7 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-bold text-gray-800">{selectedStudent.nama_siswa}</h3>
-              <p className="text-gray-600">ID: {selectedStudent.id_siswa}</p>
+              <p className="text-gray-600">NISN: {selectedStudent.id_siswa}</p>
             </div>
             <Button
               variant="outline"

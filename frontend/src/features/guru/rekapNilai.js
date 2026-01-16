@@ -39,6 +39,8 @@ const RekapNilai = ({ activeTASemester, userId }) => {
   const [cronbachAlpha, setCronbachAlpha] = useState(null);
   const [semValue, setSemValue] = useState(null);
   const [uploadedFile, setUploadedFile] = useState(null); // for Excel upload
+  const [errorDetails, setErrorDetails] = useState([]);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
 
 
   const classifyByP = (p) => {
@@ -353,6 +355,24 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Validasi ekstensi file
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+      setMessage('❌ Format file tidak valid! Hanya file Excel (.xlsx atau .xls) yang diperbolehkan.');
+      setMessageType('error');
+      e.target.value = '';
+      return;
+    }
+
+    // Validasi ukuran file (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setMessage('❌ File terlalu besar! Maksimal 5MB.');
+      setMessageType('error');
+      e.target.value = '';
+      return;
+    }
+
     try {
       const XLSX = await import('xlsx');
       const reader = new FileReader();
@@ -361,23 +381,42 @@ const RekapNilai = ({ activeTASemester, userId }) => {
         try {
           const data = new Uint8Array(evt.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Validasi: pastikan ada sheet
+          if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            setMessage('❌ File Excel kosong atau corrupt! Tidak ada sheet yang ditemukan.');
+            setMessageType('error');
+            e.target.value = '';
+            return;
+          }
+          
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
           
+          // Validasi: minimal 3 baris (header + bobot + 1 siswa)
           if (json.length < 3) {
-            setMessage('Format Excel tidak valid! Minimal harus ada header, bobot, dan 1 siswa.');
+            setMessage('❌ Format Excel tidak valid! Minimal harus ada:\n• Baris 1: Header (No, Nama Siswa, Soal 1, Soal 2, ...)\n• Baris 2: Bobot per soal\n• Baris 3+: Data siswa');
             setMessageType('error');
+            e.target.value = '';
             return;
           }
           
           // Parse header (row 0): ['No', 'Nama Siswa', 'Q1', 'Q2', ...] atau format apapun
           const headers = json[0];
+          if (!headers || headers.length < 3) {
+            setMessage('❌ Header tidak valid! Pastikan ada kolom: No, Nama Siswa, dan minimal 1 kolom soal.');
+            setMessageType('error');
+            e.target.value = '';
+            return;
+          }
+          
           const rawQCols = headers.slice(2); // Skip 'No' dan 'Nama Siswa'
           
           if (rawQCols.length === 0) {
-            setMessage('Tidak ada kolom soal di Excel! Pastikan ada kolom setelah "Nama Siswa".');
+            setMessage('❌ Tidak ada kolom soal di Excel! Pastikan ada kolom setelah "Nama Siswa".');
             setMessageType('error');
+            e.target.value = '';
             return;
           }
           
@@ -398,22 +437,58 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           // Parse bobot (row 1): ['', 'BOBOT →', 1, 1, ...]
           const bobotRow = json[1];
           const newWeights = {};
+          const invalidWeights = [];
+          
           qCols.forEach((q, idx) => {
-            newWeights[q] = Number(bobotRow[idx + 2]) || 1;
+            const bobotValue = bobotRow[idx + 2];
+            const bobotNum = Number(bobotValue);
+            
+            // Validasi bobot harus angka positif
+            if (bobotValue === null || bobotValue === undefined || bobotValue === '' || isNaN(bobotNum) || bobotNum <= 0) {
+              invalidWeights.push(`${q} (${bobotValue})`);
+              newWeights[q] = 1; // Default ke 1 jika invalid
+            } else {
+              newWeights[q] = bobotNum;
+            }
           });
+          
+          // Warning jika ada bobot invalid
+          if (invalidWeights.length > 0) {
+            console.warn('Invalid weights detected:', invalidWeights);
+            setMessage(`⚠️ Bobot tidak valid untuk: ${invalidWeights.join(', ')}. Menggunakan bobot default = 1.`);
+            setMessageType('warning');
+          }
           
           // Parse data siswa (row 2+)
           const newAnswers = {};
           const students = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }));
+          
+          // Validasi: pastikan ada data siswa di sistem
+          if (students.length === 0) {
+            setMessage('❌ Tidak ada data siswa di sistem! Pastikan sudah ada siswa di kelas ini atau generate grid terlebih dahulu.');
+            setMessageType('error');
+            e.target.value = '';
+            return;
+          }
+          
           const matchedStudents = []; // Track matched students
-          let unmatchedCount = 0;
+          const unmatchedNames = []; // Track unmatched names
+          const invalidValues = []; // Track invalid values (nilai > bobot)
+          const duplicateNames = new Set(); // Track duplicate student names
+          const seenNames = new Set();
           
           for (let i = 2; i < json.length; i++) {
             const row = json[i];
             if (!row || row.length < 2) continue;
             
             const namaSiswa = String(row[1] || '').trim();
-            if (!namaSiswa || namaSiswa === 'BOBOT →') continue;
+            if (!namaSiswa || namaSiswa === 'BOBOT →' || namaSiswa.toLowerCase() === 'total bobot') continue;
+            
+            // Deteksi duplicate names di Excel
+            if (seenNames.has(namaSiswa.toLowerCase())) {
+              duplicateNames.add(namaSiswa);
+            }
+            seenNames.add(namaSiswa.toLowerCase());
             
             // Cari siswa berdasarkan nama (case-insensitive, flexible matching)
             const student = students.find(s => 
@@ -421,21 +496,54 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             );
             
             if (!student) {
-              unmatchedCount++;
-              console.warn(`Siswa tidak ditemukan: ${namaSiswa}`);
+              unmatchedNames.push(namaSiswa);
               continue;
             }
             
             if (!newAnswers[student.id_siswa]) newAnswers[student.id_siswa] = {};
             matchedStudents.push(student);
             
-            // Parse nilai per soal
+            // Parse nilai per soal dengan validasi
             qCols.forEach((q, idx) => {
               const val = row[idx + 2];
               if (val !== null && val !== undefined && val !== '') {
-                newAnswers[student.id_siswa][q] = Number(val);
+                const numVal = Number(val);
+                const bobotSoal = newWeights[q] || 1;
+                
+                // Validasi: nilai harus numerik
+                if (isNaN(numVal)) {
+                  invalidValues.push(`${namaSiswa} - ${q}: "${val}" (bukan angka)`);
+                  return;
+                }
+                
+                // Validasi: nilai tidak boleh negatif
+                if (numVal < 0) {
+                  invalidValues.push(`${namaSiswa} - ${q}: ${numVal} (negatif)`);
+                  return;
+                }
+                
+                // Warning: nilai melebihi bobot (tetap dimasukkan tapi dengan warning)
+                if (numVal > bobotSoal) {
+                  invalidValues.push(`${namaSiswa} - ${q}: ${numVal} > bobot ${bobotSoal}`);
+                }
+                
+                newAnswers[student.id_siswa][q] = numVal;
               }
             });
+          }
+          
+          // Validasi: minimal 1 siswa harus match
+          if (matchedStudents.length === 0) {
+            const errors = unmatchedNames.map(name => ({
+              student: name,
+              error: 'Nama tidak ditemukan di sistem'
+            }));
+            setErrorDetails(errors);
+            setShowErrorDetails(true);
+            setMessage(`❌ Tidak ada nama siswa yang cocok! ${unmatchedNames.length} nama tidak ditemukan. Lihat detail di bawah.`);
+            setMessageType('error');
+            e.target.value = '';
+            return;
           }
           
           // Update state
@@ -448,30 +556,89 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             setAnalysisStudents(matchedStudents);
           }
           
-          // Success message dengan info detail
-          let msg = `✅ Excel berhasil diupload! ${qCols.length} soal, ${matchedStudents.length} siswa`;
-          if (unmatchedCount > 0) {
-            msg += ` (⚠️ ${unmatchedCount} nama tidak cocok)`;
+          // Build detailed success/warning message
+          let msg = `✅ Excel berhasil diupload!\n`;
+          msg += `📊 ${qCols.length} soal, ${matchedStudents.length} siswa berhasil dimuat`;
+          
+          const errors = [];
+          
+          // Collect all errors for detail panel
+          if (unmatchedNames.length > 0) {
+            unmatchedNames.forEach(name => {
+              errors.push({
+                student: name,
+                error: 'Nama tidak ditemukan di sistem'
+              });
+            });
           }
+          
+          if (duplicateNames.size > 0) {
+            Array.from(duplicateNames).forEach(name => {
+              errors.push({
+                student: name,
+                error: 'Nama duplikat di Excel'
+              });
+            });
+          }
+          
+          if (invalidValues.length > 0) {
+            invalidValues.forEach(errMsg => {
+              // Parse error message untuk extract info
+              // Format: "Nama - Q1: nilai (deskripsi)"
+              const parts = errMsg.split(' - ');
+              const studentName = parts[0];
+              const questionPart = parts[1] || '';
+              const [question, valuePart] = questionPart.split(': ');
+              
+              errors.push({
+                student: studentName,
+                question: question,
+                value: valuePart ? valuePart.split(' ')[0] : undefined,
+                error: errMsg.includes('bukan angka') ? 'Nilai bukan angka yang valid' : 
+                       errMsg.includes('negatif') ? 'Nilai tidak boleh negatif' :
+                       errMsg.includes('>') ? 'Nilai melebihi bobot maksimal' : 'Nilai tidak valid'
+              });
+            });
+          }
+          
+          // Set error details if any
+          if (errors.length > 0) {
+            setErrorDetails(errors);
+            setShowErrorDetails(true);
+            msg += `\n\n⚠️ ${errors.length} masalah ditemukan. Klik "Detail Error" di bawah untuk melihat.`;
+            setMessageType('warning');
+          } else {
+            setErrorDetails([]);
+            setShowErrorDetails(false);
+            setMessageType('success');
+          }
+          
           setMessage(msg);
-          setMessageType('success');
           
           // Reset file input
           e.target.value = '';
           
         } catch (err) {
           console.error('Error parsing Excel:', err);
-          setMessage('Gagal memproses Excel: ' + err.message);
+          setMessage('❌ Gagal memproses Excel: ' + (err.message || 'Unknown error') + '\n\n💡 Pastikan file Excel tidak corrupt dan format sesuai template.');
           setMessageType('error');
+          e.target.value = '';
         }
+      };
+      
+      reader.onerror = () => {
+        setMessage('❌ Gagal membaca file! File mungkin corrupt atau sedang digunakan aplikasi lain.');
+        setMessageType('error');
+        e.target.value = '';
       };
       
       reader.readAsArrayBuffer(file);
       
     } catch (err) {
       console.error('Error uploading Excel:', err);
-      setMessage('Gagal upload Excel: ' + err.message);
+      setMessage('❌ Gagal upload Excel: ' + (err.message || 'Unknown error'));
       setMessageType('error');
+      e.target.value = '';
     }
   };
 
@@ -809,6 +976,65 @@ const RekapNilai = ({ activeTASemester, userId }) => {
 
       {message && <StatusMessage type={messageType} message={message} />}
 
+      {errorDetails.length > 0 && (
+        <div className="mb-6">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <button
+                onClick={() => setShowErrorDetails(!showErrorDetails)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <h4 className="font-semibold text-red-800 flex items-center">
+                  <i className="fas fa-exclamation-triangle mr-2"></i>
+                  Detail Error Upload Excel ({errorDetails.length})
+                </h4>
+                <i className={`fas fa-chevron-${showErrorDetails ? 'up' : 'down'} text-red-600`}></i>
+              </button>
+              
+              {showErrorDetails && (
+                <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
+                  {errorDetails.map((err, idx) => (
+                    <div key={idx} className="bg-white border border-red-300 rounded p-3 text-sm">
+                      {err.student && (
+                        <div className="font-medium text-gray-900 mb-1">
+                          <i className="fas fa-user mr-1 text-red-600"></i>
+                          {err.student}
+                        </div>
+                      )}
+                      {err.question && (
+                        <div className="text-gray-700 mb-1">
+                          <i className="fas fa-question-circle mr-1 text-blue-600"></i>
+                          Soal: <strong>{err.question}</strong>
+                          {err.value !== undefined && <> - Nilai: <strong>{err.value}</strong></>}
+                        </div>
+                      )}
+                      <div className="text-red-700">
+                        <i className="fas fa-times-circle mr-1"></i>
+                        {err.error}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="mt-3 pt-3 border-t border-red-200">
+                    <button
+                      onClick={() => {
+                        const errorText = errorDetails.map((err, idx) => 
+                          `${idx + 1}. ${err.student ? `${err.student}` : ''} ${err.question ? `(${err.question})` : ''}: ${err.error}`
+                        ).join('\n');
+                        navigator.clipboard.writeText(errorText);
+                        setMessage('Error details berhasil dicopy ke clipboard');
+                        setMessageType('success');
+                      }}
+                      className="text-sm text-red-700 hover:text-red-900 underline"
+                    >
+                      <i className="fas fa-copy mr-1"></i>
+                      Copy Error Details
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+        </div>
+      )}
+
       {!activeTASemester && (
         <StatusMessage
           type="warning"
@@ -985,7 +1211,25 @@ const RekapNilai = ({ activeTASemester, userId }) => {
                                       <th key={k} className="p-2 border text-center">
                                         <div className="text-sm font-semibold">Soal {k.replace('Q','')}</div>
                                         <div className="mt-1">
-                                          <input title="Bobot/Max Score" type="number" step="0.01" min="0" value={weights[k] ?? 1} onChange={e=> setWeights({ ...weights, [k]: Number(e.target.value) })} className="w-16 px-1 py-0.5 border rounded text-center" />
+                                          <input 
+                                            title="Bobot/Max Score" 
+                                            type="number" 
+                                            step="0.01" 
+                                            min="0" 
+                                            value={weights[k] !== undefined && weights[k] !== '' ? weights[k] : ''} 
+                                            onChange={e => {
+                                              const val = e.target.value;
+                                              setWeights({ ...weights, [k]: val === '' ? '' : Number(val) });
+                                            }}
+                                            onBlur={e => {
+                                              // Set default 1 jika kosong saat blur
+                                              if (e.target.value === '' || Number(e.target.value) <= 0) {
+                                                setWeights({ ...weights, [k]: 1 });
+                                              }
+                                            }}
+                                            className="w-16 px-1 py-0.5 border rounded text-center" 
+                                            placeholder="1"
+                                          />
                                         </div>
                                       </th>
                                     ))}
