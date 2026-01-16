@@ -9,9 +9,11 @@ import FormSection from '../../components/FormSection';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import StatusMessage from '../../components/StatusMessage';
 import EmptyState from '../../components/EmptyState';
+import { useToast } from '../../context/ToastContext';
 import { runCTTAnalysis, exportCTTAnalysisToExcel } from '../../utils/ctt';
 
 const RekapNilai = ({ activeTASemester, userId }) => {
+  const { toast } = useToast();
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState('');
   const [rekapNilai, setRekapNilai] = useState([]);
@@ -73,8 +75,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
   const runAnalysis = () => {
     // Validasi: harus ada grid soal terlebih dahulu
     if (!questionKeys || questionKeys.length === 0) {
-      setMessage('Harap generate grid soal terlebih dahulu!');
-      setMessageType('error');
+      toast.error('Harap generate grid soal terlebih dahulu!');
       return;
     }
 
@@ -98,8 +99,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     setAnalysisResults(labeled);
     setCronbachAlpha(alpha);
     setSemValue(sem);
-    setMessage('Analisis berhasil dijalankan!');
-    setMessageType('success');
+    toast.success('Analisis berhasil dijalankan!');
   };
 
   const analysisColumns = [
@@ -313,8 +313,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
   // Download template Excel untuk input data
   const downloadTemplateExcel = async () => {
     if (!questionKeys || questionKeys.length === 0) {
-      setMessage('Harap generate grid terlebih dahulu!');
-      setMessageType('error');
+      toast.error('Harap generate grid terlebih dahulu!');
       return;
     }
 
@@ -346,8 +345,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     // Download
     XLSX.writeFile(wb, `template_analisis_${questionKeys.length}soal.xlsx`);
     
-    setMessage(`Template Excel berhasil didownload! (${questionKeys.length} soal, ${students.length} siswa)`);
-    setMessageType('success');
+    toast.success(`Template Excel berhasil didownload! (${questionKeys.length} soal, ${students.length} siswa)`);
   };
 
   // Upload dan parse Excel (bisa tanpa generate grid dulu!)
@@ -358,8 +356,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     // Validasi ekstensi file
     const fileName = file.name.toLowerCase();
     if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
-      setMessage('❌ Format file tidak valid! Hanya file Excel (.xlsx atau .xls) yang diperbolehkan.');
-      setMessageType('error');
+      toast.error('❌ Format file tidak valid! Hanya file Excel (.xlsx atau .xls) yang diperbolehkan.');
       e.target.value = '';
       return;
     }
@@ -367,8 +364,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     // Validasi ukuran file (max 5MB)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      setMessage('❌ File terlalu besar! Maksimal 5MB.');
-      setMessageType('error');
+      toast.error('❌ File terlalu besar! Maksimal 5MB.');
       e.target.value = '';
       return;
     }
@@ -384,8 +380,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           
           // Validasi: pastikan ada sheet
           if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-            setMessage('❌ File Excel kosong atau corrupt! Tidak ada sheet yang ditemukan.');
-            setMessageType('error');
+            toast.error('❌ File Excel kosong atau corrupt! Tidak ada sheet yang ditemukan.');
             e.target.value = '';
             return;
           }
@@ -396,8 +391,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           
           // Validasi: minimal 3 baris (header + bobot + 1 siswa)
           if (json.length < 3) {
-            setMessage('❌ Format Excel tidak valid! Minimal harus ada:\n• Baris 1: Header (No, Nama Siswa, Soal 1, Soal 2, ...)\n• Baris 2: Bobot per soal\n• Baris 3+: Data siswa');
-            setMessageType('error');
+            toast.error('❌ Format Excel tidak valid! Minimal harus ada:\n• Baris 1: Header (No, Nama Siswa, Soal 1, Soal 2, ...)\n• Baris 2: Bobot per soal\n• Baris 3+: Data siswa');
             e.target.value = '';
             return;
           }
@@ -405,8 +399,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           // Parse header (row 0): ['No', 'Nama Siswa', 'Q1', 'Q2', ...] atau format apapun
           const headers = json[0];
           if (!headers || headers.length < 3) {
-            setMessage('❌ Header tidak valid! Pastikan ada kolom: No, Nama Siswa, dan minimal 1 kolom soal.');
-            setMessageType('error');
+            toast.error('❌ Header tidak valid! Pastikan ada kolom: No, Nama Siswa, dan minimal 1 kolom soal.');
             e.target.value = '';
             return;
           }
@@ -414,8 +407,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           const rawQCols = headers.slice(2); // Skip 'No' dan 'Nama Siswa'
           
           if (rawQCols.length === 0) {
-            setMessage('❌ Tidak ada kolom soal di Excel! Pastikan ada kolom setelah "Nama Siswa".');
-            setMessageType('error');
+            toast.error('❌ Tidak ada kolom soal di Excel! Pastikan ada kolom setelah "Nama Siswa".');
             e.target.value = '';
             return;
           }
@@ -455,8 +447,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           // Warning jika ada bobot invalid
           if (invalidWeights.length > 0) {
             console.warn('Invalid weights detected:', invalidWeights);
-            setMessage(`⚠️ Bobot tidak valid untuk: ${invalidWeights.join(', ')}. Menggunakan bobot default = 1.`);
-            setMessageType('warning');
+            toast.warning(`⚠️ Bobot tidak valid untuk: ${invalidWeights.join(', ')}. Menggunakan bobot default = 1.`);
           }
           
           // Parse data siswa (row 2+)
@@ -465,8 +456,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           
           // Validasi: pastikan ada data siswa di sistem
           if (students.length === 0) {
-            setMessage('❌ Tidak ada data siswa di sistem! Pastikan sudah ada siswa di kelas ini atau generate grid terlebih dahulu.');
-            setMessageType('error');
+            toast.error('❌ Tidak ada data siswa di sistem! Pastikan sudah ada siswa di kelas ini atau generate grid terlebih dahulu.');
             e.target.value = '';
             return;
           }
@@ -540,8 +530,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             }));
             setErrorDetails(errors);
             setShowErrorDetails(true);
-            setMessage(`❌ Tidak ada nama siswa yang cocok! ${unmatchedNames.length} nama tidak ditemukan. Lihat detail di bawah.`);
-            setMessageType('error');
+            toast.error(`❌ Tidak ada nama siswa yang cocok! ${unmatchedNames.length} nama tidak ditemukan. Lihat detail di bawah.`);
             e.target.value = '';
             return;
           }
@@ -555,10 +544,6 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           if (analysisStudents.length === 0 && matchedStudents.length > 0) {
             setAnalysisStudents(matchedStudents);
           }
-          
-          // Build detailed success/warning message
-          let msg = `✅ Excel berhasil diupload!\n`;
-          msg += `📊 ${qCols.length} soal, ${matchedStudents.length} siswa berhasil dimuat`;
           
           const errors = [];
           
@@ -601,34 +586,29 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             });
           }
           
-          // Set error details if any
+          // Set error details if any and show toast notification
           if (errors.length > 0) {
             setErrorDetails(errors);
             setShowErrorDetails(true);
-            msg += `\n\n⚠️ ${errors.length} masalah ditemukan. Klik "Detail Error" di bawah untuk melihat.`;
-            setMessageType('warning');
+            toast.warning(`⚠️ Excel diupload dengan ${errors.length} masalah. ${qCols.length} soal, ${matchedStudents.length} siswa berhasil dimuat. Klik "Detail Error" untuk melihat.`);
           } else {
             setErrorDetails([]);
             setShowErrorDetails(false);
-            setMessageType('success');
+            toast.success(`✅ Excel berhasil diupload! 📊 ${qCols.length} soal, ${matchedStudents.length} siswa berhasil dimuat.`);
           }
-          
-          setMessage(msg);
           
           // Reset file input
           e.target.value = '';
           
         } catch (err) {
           console.error('Error parsing Excel:', err);
-          setMessage('❌ Gagal memproses Excel: ' + (err.message || 'Unknown error') + '\n\n💡 Pastikan file Excel tidak corrupt dan format sesuai template.');
-          setMessageType('error');
+          toast.error('❌ Gagal memproses Excel: ' + (err.message || 'Unknown error') + '. 💡 Pastikan file Excel tidak corrupt dan format sesuai template.');
           e.target.value = '';
         }
       };
       
       reader.onerror = () => {
-        setMessage('❌ Gagal membaca file! File mungkin corrupt atau sedang digunakan aplikasi lain.');
-        setMessageType('error');
+        toast.error('❌ Gagal membaca file! File mungkin corrupt atau sedang digunakan aplikasi lain.');
         e.target.value = '';
       };
       
@@ -636,8 +616,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
       
     } catch (err) {
       console.error('Error uploading Excel:', err);
-      setMessage('❌ Gagal upload Excel: ' + (err.message || 'Unknown error'));
-      setMessageType('error');
+      toast.error('❌ Gagal upload Excel: ' + (err.message || 'Unknown error'));
       e.target.value = '';
     }
   };
@@ -974,8 +953,6 @@ const RekapNilai = ({ activeTASemester, userId }) => {
         badge={currentAssignment ? `${currentAssignment.nama_kelas} - ${currentAssignment.nama_mapel}` : null}
       />
 
-      {message && <StatusMessage type={messageType} message={message} />}
-
       {errorDetails.length > 0 && (
         <div className="mb-6">
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -1020,8 +997,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
                           `${idx + 1}. ${err.student ? `${err.student}` : ''} ${err.question ? `(${err.question})` : ''}: ${err.error}`
                         ).join('\n');
                         navigator.clipboard.writeText(errorText);
-                        setMessage('Error details berhasil dicopy ke clipboard');
-                        setMessageType('success');
+                        toast.success('Error details berhasil dicopy ke clipboard');
                       }}
                       className="text-sm text-red-700 hover:text-red-900 underline"
                     >
@@ -1192,8 +1168,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
                                 setAnalysisResults([]); 
                                 setCronbachAlpha(null); 
                                 setSemValue(null);
-                                setMessage('Hasil analisis dihapus');
-                                setMessageType('info');
+                                toast.success('Hasil analisis dihapus');
                               }}>Clear Analysis</Button>
                             </div>
                           </div>
