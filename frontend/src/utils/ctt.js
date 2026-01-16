@@ -5,6 +5,7 @@ export const getDefaultForScale = (scale) => {
   if (scale === 'binary') return { max: 1, threshold: 1 };
   if (scale === '5') return { max: 5, threshold: 4 };
   if (scale === '100') return { max: 100, threshold: 60 };
+  if (scale === 'custom') return { max: 4, threshold: 3 }; // default for custom, user can edit per question
   return { max: 1, threshold: 1 };
 };
 
@@ -49,10 +50,10 @@ export function runCTTAnalysis({
     let weightedPoints = 0; let totalWeight = 0;
     itemKeys.forEach(k => {
       const v = row[k];
-      const m = (maxes && maxes[k]) ? Number(maxes[k]) : defMax;
-      const w = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
-      if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) { weightedPoints += (Number(v) / (m>0?m:1)) * w; }
-      totalWeight += w;
+      // Bobot = Max Score
+      const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
+      if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) { weightedPoints += (Number(v) / (bobot>0?bobot:1)) * bobot; }
+      totalWeight += bobot;
     });
     return (totalWeight > 0) ? (weightedPoints / totalWeight) : null;
   });
@@ -63,7 +64,20 @@ export function runCTTAnalysis({
     const fr = {};
     itemKeys.forEach(k => {
       const v = row[k];
-      if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) fr[k] = Number(v) / defMax; else fr[k] = null;
+      // Bobot = Max Score
+      const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
+      // DEBUG: Log first question calculation
+      if (k === itemKeys[0] && s === students[0]) {
+        console.log('🔍 DEBUG CTT Calculation:');
+        console.log(`  Question: ${k}`);
+        console.log(`  Student: ${s.nama_siswa || s.id_siswa}`);
+        console.log(`  Value (v): ${v}`);
+        console.log(`  Bobot (weights[k]): ${weights ? weights[k] : 'weights is null'}`);
+        console.log(`  Calculated bobot: ${bobot}`);
+        console.log(`  Fraction (v/bobot): ${v} / ${bobot} = ${Number(v) / bobot}`);
+        console.log(`  Scale: ${scale}, defMax: ${defMax}`);
+      }
+      if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) fr[k] = Number(v) / (bobot > 0 ? bobot : 1); else fr[k] = null;
     });
     return { id: s.id_siswa, fractions: fr };
   });

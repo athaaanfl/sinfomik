@@ -8,7 +8,7 @@ exports.verifyToken = (req, res, next) => {
     const { getDb } = require('../config/db');
     
     // Get token from HTTP-only cookie first, fallback to Authorization header (backward compatibility)
-    let token = req.cookies?.authToken; // Prioritas: Cookie (lebih aman)
+    let token = req.cookies?.token; // Prioritas: Cookie (lebih aman) - cookie name is 'token'
     
     if (!token) {
         // Fallback: Cek Authorization header untuk backward compatibility

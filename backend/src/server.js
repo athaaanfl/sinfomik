@@ -403,9 +403,11 @@ function startServer(port, attempt = 0) {
     // Handle shutdown signals
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    
+
     return srv;
 }
+
+
 
 // Initialize database then start server
 (async () => {
