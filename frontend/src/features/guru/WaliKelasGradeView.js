@@ -913,7 +913,19 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
       ) : activeView === 'grades' && (
         <div className="space-y-8">
           {Array.from(processedData.gradesPerSubjectTable.entries()).map(([nama_mapel, studentsGradeList]) => {
-            const uniqueTipeNilai = Array.from(processedData.uniqueTipeNilaiPerMapel.get(nama_mapel) || []).sort();
+            const uniqueTipeNilai = Array.from(processedData.uniqueTipeNilaiPerMapel.get(nama_mapel) || []).sort((a, b) => {
+              // Custom sort: TP1, TP2, TP3, ..., UAS
+              if (a.startsWith('TP') && b.startsWith('TP')) {
+                const numA = parseInt(a.substring(2));
+                const numB = parseInt(b.substring(2));
+                return numA - numB;
+              } else if (a.startsWith('TP') && b === 'UAS') {
+                return -1; // TP comes before UAS
+              } else if (a === 'UAS' && b.startsWith('TP')) {
+                return 1; // UAS comes after TP
+              }
+              return a.localeCompare(b);
+            });
 
             return (
               <div key={nama_mapel} className="border rounded-lg p-4 bg-gray-50">
