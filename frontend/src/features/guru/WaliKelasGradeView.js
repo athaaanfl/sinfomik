@@ -195,9 +195,7 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
         summaryStudentMap.set(grade.id_siswa, {
           id_siswa: grade.id_siswa,
           nama_siswa: grade.nama_siswa,
-          overall_total: 0,
-          overall_count: 0,
-          subject_totals: new Map(),
+          subject_grades: new Map(), // Store TP and UAS separately per subject
         });
       }
       
@@ -214,8 +212,8 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
         studentsInSubjectMap.set(grade.id_siswa, {
           id_siswa: grade.id_siswa,
           nama_siswa: grade.nama_siswa,
-          total_mapel_nilai: 0,
-          count_mapel_nilai: 0,
+          tp_grades: [],
+          uas_grade: null,
         });
       }
       const studentSubjectData = studentsInSubjectMap.get(grade.id_siswa);
@@ -225,51 +223,113 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
         : grade.jenis_nilai;
       
       studentSubjectData[displayKey] = grade.nilai;
-      studentSubjectData.total_mapel_nilai += grade.nilai;
-      studentSubjectData.count_mapel_nilai++;
+      
+      // Collect TP and UAS separately
+      if (grade.jenis_nilai === 'TP') {
+        studentSubjectData.tp_grades.push(grade.nilai);
+      } else if (grade.jenis_nilai === 'UAS') {
+        studentSubjectData.uas_grade = grade.nilai;
+      }
 
       if (!uniqueTipeNilaiPerMapel.has(grade.nama_mapel)) {
         uniqueTipeNilaiPerMapel.set(grade.nama_mapel, new Set());
       }
       uniqueTipeNilaiPerMapel.get(grade.nama_mapel).add(displayKey);
 
+      // Store grades by subject for summary calculation
       const studentSummary = summaryStudentMap.get(grade.id_siswa);
-      studentSummary.overall_total += grade.nilai;
-      studentSummary.overall_count++;
-
-      if (!studentSummary.subject_totals.has(grade.nama_mapel)) {
-        studentSummary.subject_totals.set(grade.nama_mapel, { total: 0, count: 0 });
+      if (!studentSummary.subject_grades.has(grade.nama_mapel)) {
+        studentSummary.subject_grades.set(grade.nama_mapel, { tp_grades: [], uas_grade: null });
       }
-      const subjectTotal = studentSummary.subject_totals.get(grade.nama_mapel);
-      subjectTotal.total += grade.nilai;
-      subjectTotal.count++;
+      const subjectGrades = studentSummary.subject_grades.get(grade.nama_mapel);
+      if (grade.jenis_nilai === 'TP') {
+        subjectGrades.tp_grades.push(grade.nilai);
+      } else if (grade.jenis_nilai === 'UAS') {
+        subjectGrades.uas_grade = grade.nilai;
+      }
 
+      // For chart: calculate weighted average per subject
       if (!subjectChartMap.has(grade.nama_mapel)) {
-        subjectChartMap.set(grade.nama_mapel, { total_nilai: 0, count: 0 });
+        subjectChartMap.set(grade.nama_mapel, { students: new Map() });
       }
       const subjectChart = subjectChartMap.get(grade.nama_mapel);
-      subjectChart.total_nilai += grade.nilai;
-      subjectChart.count++;
+      if (!subjectChart.students.has(grade.id_siswa)) {
+        subjectChart.students.set(grade.id_siswa, { tp_grades: [], uas_grade: null });
+      }
+      const studentChartData = subjectChart.students.get(grade.id_siswa);
+      if (grade.jenis_nilai === 'TP') {
+        studentChartData.tp_grades.push(grade.nilai);
+      } else if (grade.jenis_nilai === 'UAS') {
+        studentChartData.uas_grade = grade.nilai;
+      }
     });
 
+    // Calculate final grades per subject (70% TP + 30% UAS)
     const finalGradesPerSubjectTable = new Map();
     gradesPerSubjectTable.forEach((studentsMap, nama_mapel) => {
-      const studentList = Array.from(studentsMap.values()).map(student => ({
-        ...student,
-        rata_rata_mapel: student.count_mapel_nilai > 0 ? parseFloat((student.total_mapel_nilai / student.count_mapel_nilai).toFixed(2)) : 0,
-      })).sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa));
+      const studentList = Array.from(studentsMap.values()).map(student => {
+        const tpAvg = student.tp_grades.length > 0 
+          ? student.tp_grades.reduce((sum, val) => sum + val, 0) / student.tp_grades.length 
+          : 0;
+        const uas = student.uas_grade !== null ? student.uas_grade : 0;
+        
+        // Calculate weighted final grade: 70% TP + 30% UAS
+        let rata_rata_mapel = 0;
+        if (student.tp_grades.length > 0 && student.uas_grade !== null) {
+          rata_rata_mapel = parseFloat((tpAvg * 0.7 + uas * 0.3).toFixed(2));
+        } else if (student.tp_grades.length > 0) {
+          rata_rata_mapel = parseFloat(tpAvg.toFixed(2));
+        } else if (student.uas_grade !== null) {
+          rata_rata_mapel = parseFloat(uas.toFixed(2));
+        }
+        
+        return {
+          ...student,
+          rata_rata_mapel,
+        };
+      }).sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa));
       finalGradesPerSubjectTable.set(nama_mapel, studentList);
     });
 
+    // Calculate overall final average: average of subject final grades (weighted)
     const summaryTableData = Array.from(summaryStudentMap.values()).map(student => {
       const studentSummaryObj = {
         id_siswa: student.id_siswa,
         nama_siswa: student.nama_siswa,
-        overall_final_average: student.overall_count > 0 ? parseFloat((student.overall_total / student.overall_count).toFixed(2)) : 0,
       };
-      student.subject_totals.forEach((data, nama_mapel) => {
-        studentSummaryObj[`${nama_mapel}_RataRata`] = data.count > 0 ? parseFloat((data.total / data.count).toFixed(2)) : null;
+      
+      let totalWeightedAvg = 0;
+      let subjectCount = 0;
+      
+      // Calculate weighted average per subject and store
+      student.subject_grades.forEach((grades, nama_mapel) => {
+        const tpAvg = grades.tp_grades.length > 0 
+          ? grades.tp_grades.reduce((sum, val) => sum + val, 0) / grades.tp_grades.length 
+          : null;
+        const uas = grades.uas_grade;
+        
+        let subjectFinalGrade = null;
+        if (tpAvg !== null && uas !== null) {
+          subjectFinalGrade = parseFloat((tpAvg * 0.7 + uas * 0.3).toFixed(2));
+        } else if (tpAvg !== null) {
+          subjectFinalGrade = parseFloat(tpAvg.toFixed(2));
+        } else if (uas !== null) {
+          subjectFinalGrade = parseFloat(uas.toFixed(2));
+        }
+        
+        studentSummaryObj[`${nama_mapel}_RataRata`] = subjectFinalGrade;
+        
+        if (subjectFinalGrade !== null) {
+          totalWeightedAvg += subjectFinalGrade;
+          subjectCount++;
+        }
       });
+      
+      // Overall final average = average of all subject final grades
+      studentSummaryObj.overall_final_average = subjectCount > 0 
+        ? parseFloat((totalWeightedAvg / subjectCount).toFixed(2)) 
+        : 0;
+      
       return studentSummaryObj;
     }).sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa));
 
@@ -289,19 +349,46 @@ const WaliKelasGradeView = ({ activeTASemester, userId }) => {
       percentage: totalStudentsForDistribution > 0 ? parseFloat(((count / totalStudentsForDistribution) * 100).toFixed(2)) : 0,
     }));
 
-    const gradesByStudentChart = Array.from(summaryStudentMap.values()).map(student => ({
+    // Chart per student: use final weighted average (already calculated in summaryTableData)
+    const gradesByStudentChart = summaryTableData.map(student => ({
       nama_siswa: student.nama_siswa,
-      rata_rata: student.overall_count > 0 ? parseFloat((student.overall_total / student.overall_count).toFixed(2)) : 0,
-    })).sort((a, b) => a.nama_siswa.localeCompare(b.nama_siswa));
+      rata_rata: student.overall_final_average,
+    }));
 
-    // Build gradesBySubjectChart using ALL subjects taught in the class
-    // so subjects without any recorded nilai will still show up (hasData=false)
+    // Build gradesBySubjectChart using weighted averages (70% TP + 30% UAS)
     const allSubjects = Array.from(finalGradesPerSubjectTable.keys()).sort();
     let gradesBySubjectChart = allSubjects.map(name => {
-      const data = subjectChartMap.get(name);
-      const hasData = !!data && data.count > 0;
-      const rata = hasData ? parseFloat((data.total_nilai / data.count).toFixed(2)) : 0;
-      return { nama_mapel: name, rata_rata: rata, hasData };
+      const chartData = subjectChartMap.get(name);
+      const hasData = !!chartData && chartData.students.size > 0;
+      
+      if (!hasData) {
+        return { nama_mapel: name, rata_rata: 0, hasData: false };
+      }
+      
+      // Calculate weighted average for this subject across all students
+      let totalWeightedGrades = 0;
+      let studentCount = 0;
+      
+      chartData.students.forEach((grades) => {
+        const tpAvg = grades.tp_grades.length > 0 
+          ? grades.tp_grades.reduce((sum, val) => sum + val, 0) / grades.tp_grades.length 
+          : null;
+        const uas = grades.uas_grade;
+        
+        if (tpAvg !== null && uas !== null) {
+          totalWeightedGrades += (tpAvg * 0.7 + uas * 0.3);
+          studentCount++;
+        } else if (tpAvg !== null) {
+          totalWeightedGrades += tpAvg;
+          studentCount++;
+        } else if (uas !== null) {
+          totalWeightedGrades += uas;
+          studentCount++;
+        }
+      });
+      
+      const rata = studentCount > 0 ? parseFloat((totalWeightedGrades / studentCount).toFixed(2)) : 0;
+      return { nama_mapel: name, rata_rata: rata, hasData: true };
     });
 
     // Wali kelas bisa lihat semua mata pelajaran yang diajar di kelasnya

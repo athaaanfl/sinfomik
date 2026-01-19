@@ -8,49 +8,72 @@ const { getDb } = require('../config/db');
  * Access: ADMIN only
  * 
  * Returns: Trend nilai rata-rata seluruh sekolah per mata pelajaran per tahun ajaran
+ * Formula: 70% rata-rata TP + 30% UAS per siswa, kemudian di-average per sekolah
  */
 exports.getSchoolAnalytics = async (req, res) => {
     try {
         const { id_mapel, id_ta_semester } = req.query;
         const db = getDb();
 
+        // Calculate weighted average per student first (70% TP + 30% UAS), then average across school
         let query = `
+            WITH student_final_grades AS (
+                SELECT 
+                    n.id_siswa,
+                    m.id_mapel,
+                    m.nama_mapel,
+                    tas.id_ta_semester,
+                    tas.tahun_ajaran,
+                    tas.semester,
+                    AVG(CASE WHEN n.jenis_nilai = 'TP' THEN n.nilai END) as rata_tp,
+                    MAX(CASE WHEN n.jenis_nilai = 'UAS' THEN n.nilai END) as nilai_uas,
+                    CASE 
+                        WHEN AVG(CASE WHEN n.jenis_nilai = 'TP' THEN n.nilai END) IS NOT NULL 
+                         AND MAX(CASE WHEN n.jenis_nilai = 'UAS' THEN n.nilai END) IS NOT NULL
+                        THEN (AVG(CASE WHEN n.jenis_nilai = 'TP' THEN n.nilai END) * 0.7) + 
+                             (MAX(CASE WHEN n.jenis_nilai = 'UAS' THEN n.nilai END) * 0.3)
+                        ELSE NULL
+                    END as nilai_akhir
+                FROM Nilai n
+                JOIN MataPelajaran m ON n.id_mapel = m.id_mapel
+                JOIN TahunAjaranSemester tas ON n.id_ta_semester = tas.id_ta_semester
+                GROUP BY n.id_siswa, m.id_mapel, m.nama_mapel, tas.id_ta_semester, tas.tahun_ajaran, tas.semester
+            )
             SELECT 
-                m.id_mapel,
-                m.nama_mapel,
-                tas.id_ta_semester,
-                tas.tahun_ajaran,
-                tas.semester,
-                ROUND(AVG(n.nilai)::NUMERIC, 2) as rata_rata_sekolah,
-                COUNT(DISTINCT n.id_siswa) as jumlah_siswa,
-                MIN(n.nilai) as nilai_terendah,
-                MAX(n.nilai) as nilai_tertinggi,
-                COUNT(n.id_nilai) as total_nilai_entries
-            FROM Nilai n
-            JOIN MataPelajaran m ON n.id_mapel = m.id_mapel
-            JOIN TahunAjaranSemester tas ON n.id_ta_semester = tas.id_ta_semester
+                id_mapel,
+                nama_mapel,
+                id_ta_semester,
+                tahun_ajaran,
+                semester,
+                ROUND(AVG(nilai_akhir)::NUMERIC, 2) as rata_rata_sekolah,
+                COUNT(DISTINCT id_siswa) as jumlah_siswa,
+                ROUND(MIN(nilai_akhir)::NUMERIC, 2) as nilai_terendah,
+                ROUND(MAX(nilai_akhir)::NUMERIC, 2) as nilai_tertinggi,
+                COUNT(*) as total_nilai_entries
+            FROM student_final_grades
+            WHERE nilai_akhir IS NOT NULL
         `;
 
         const params = [];
         const conditions = [];
 
         if (id_mapel) {
-            conditions.push('m.id_mapel = ?');
+            conditions.push('id_mapel = ?');
             params.push(id_mapel);
         }
 
         if (id_ta_semester) {
-            conditions.push('tas.id_ta_semester = ?');
+            conditions.push('id_ta_semester = ?');
             params.push(id_ta_semester);
         }
 
         if (conditions.length > 0) {
-            query += ' WHERE ' + conditions.join(' AND ');
+            query += ' AND ' + conditions.join(' AND ');
         }
 
         query += `
-            GROUP BY m.id_mapel, m.nama_mapel, tas.id_ta_semester, tas.tahun_ajaran, tas.semester
-            ORDER BY tas.tahun_ajaran, tas.semester, m.nama_mapel
+            GROUP BY id_mapel, nama_mapel, id_ta_semester, tahun_ajaran, semester
+            ORDER BY tahun_ajaran, semester, nama_mapel
         `;
 
         db.all(query, params, (err, rows) => {
@@ -92,23 +115,47 @@ exports.getAngkatanAnalytics = async (req, res) => {
             return res.status(400).json({ message: 'Parameter tahun_ajaran_masuk diperlukan' });
         }
 
+        // Calculate weighted average per student first (70% TP + 30% UAS), then average per angkatan
         let query = `
+            WITH student_final_grades AS (
+                SELECT 
+                    s.id_siswa,
+                    s.tahun_ajaran_masuk,
+                    CAST(substr(s.tahun_ajaran_masuk,1,4) AS INTEGER) as angkatan,
+                    m.id_mapel,
+                    m.nama_mapel,
+                    tas.id_ta_semester,
+                    tas.tahun_ajaran,
+                    tas.semester,
+                    AVG(CASE WHEN n.jenis_nilai = 'TP' THEN n.nilai END) as rata_tp,
+                    MAX(CASE WHEN n.jenis_nilai = 'UAS' THEN n.nilai END) as nilai_uas,
+                    CASE 
+                        WHEN AVG(CASE WHEN n.jenis_nilai = 'TP' THEN n.nilai END) IS NOT NULL 
+                         AND MAX(CASE WHEN n.jenis_nilai = 'UAS' THEN n.nilai END) IS NOT NULL
+                        THEN (AVG(CASE WHEN n.jenis_nilai = 'TP' THEN n.nilai END) * 0.7) + 
+                             (MAX(CASE WHEN n.jenis_nilai = 'UAS' THEN n.nilai END) * 0.3)
+                        ELSE NULL
+                    END as nilai_akhir
+                FROM Nilai n
+                JOIN Siswa s ON n.id_siswa = s.id_siswa
+                JOIN MataPelajaran m ON n.id_mapel = m.id_mapel
+                JOIN TahunAjaranSemester tas ON n.id_ta_semester = tas.id_ta_semester
+                WHERE substr(s.tahun_ajaran_masuk, 1, 4) = ?
+                GROUP BY s.id_siswa, s.tahun_ajaran_masuk, m.id_mapel, m.nama_mapel, tas.id_ta_semester, tas.tahun_ajaran, tas.semester
+            )
             SELECT 
-                CAST(substr(s.tahun_ajaran_masuk,1,4) AS INTEGER) as angkatan,
-                m.id_mapel,
-                m.nama_mapel,
-                tas.id_ta_semester,
-                tas.tahun_ajaran,
-                tas.semester,
-                ROUND(AVG(n.nilai)::NUMERIC, 2) as rata_rata_angkatan,
-                COUNT(DISTINCT n.id_siswa) as jumlah_siswa,
-                MIN(n.nilai) as nilai_terendah,
-                MAX(n.nilai) as nilai_tertinggi
-            FROM Nilai n
-            JOIN Siswa s ON n.id_siswa = s.id_siswa
-            JOIN MataPelajaran m ON n.id_mapel = m.id_mapel
-            JOIN TahunAjaranSemester tas ON n.id_ta_semester = tas.id_ta_semester
-            WHERE substr(s.tahun_ajaran_masuk, 1, 4) = ?
+                angkatan,
+                id_mapel,
+                nama_mapel,
+                id_ta_semester,
+                tahun_ajaran,
+                semester,
+                ROUND(AVG(nilai_akhir)::NUMERIC, 2) as rata_rata_angkatan,
+                COUNT(DISTINCT id_siswa) as jumlah_siswa,
+                ROUND(MIN(nilai_akhir)::NUMERIC, 2) as nilai_terendah,
+                ROUND(MAX(nilai_akhir)::NUMERIC, 2) as nilai_tertinggi
+            FROM student_final_grades
+            WHERE nilai_akhir IS NOT NULL
         `;
 
         // Normalize to single year (first 4 digits) so input can be '2024' or '2024/2025'
@@ -118,13 +165,13 @@ exports.getAngkatanAnalytics = async (req, res) => {
         const params = [tahunTarget];
 
         if (id_mapel) {
-            query += ' AND m.id_mapel = ?';
+            query += ' AND id_mapel = ?';
             params.push(id_mapel);
         }
 
         query += `
-            GROUP BY CAST(substr(s.tahun_ajaran_masuk,1,4) AS INTEGER), m.id_mapel, m.nama_mapel, tas.id_ta_semester, tas.tahun_ajaran, tas.semester
-            ORDER BY tas.tahun_ajaran, tas.semester, m.nama_mapel
+            GROUP BY angkatan, id_mapel, nama_mapel, id_ta_semester, tahun_ajaran, semester
+            ORDER BY tahun_ajaran, semester, nama_mapel
         `;
 
         db.all(query, params, (err, rows) => {
@@ -181,8 +228,7 @@ exports.getStudentAnalytics = async (req, res) => {
 
         // Get historical grades
         // Select aggregated stats per (mapel, semester, kelas) for the student.
-        // Note: do NOT include non-aggregated columns such as n.jenis_nilai or n.urutan_tp
-        // to avoid GROUP BY errors in PostgreSQL.
+        // Calculate final grade using formula: 70% TP + 30% UAS
         let query = `
             SELECT 
                 s.id_siswa,
@@ -195,7 +241,10 @@ exports.getStudentAnalytics = async (req, res) => {
                 k.nama_kelas,
                 ROUND(AVG(CASE WHEN n.jenis_nilai = 'TP' THEN n.nilai END)::NUMERIC, 2) as rata_tp,
                 MAX(CASE WHEN n.jenis_nilai = 'UAS' THEN n.nilai END) as nilai_uas,
-                ROUND(AVG(n.nilai)::NUMERIC, 2) as rata_keseluruhan,
+                ROUND(
+                    (AVG(CASE WHEN n.jenis_nilai = 'TP' THEN n.nilai END) * 0.7) + 
+                    (MAX(CASE WHEN n.jenis_nilai = 'UAS' THEN n.nilai END) * 0.3)
+                ::NUMERIC, 2) as rata_keseluruhan,
                 COUNT(CASE WHEN n.jenis_nilai = 'TP' THEN 1 END) as jumlah_tp
             FROM Siswa s
             LEFT JOIN Nilai n ON s.id_siswa = n.id_siswa

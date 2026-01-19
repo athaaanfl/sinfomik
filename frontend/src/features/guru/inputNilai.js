@@ -65,7 +65,13 @@ const InputNilai = ({ activeTASemester, userId }) => {
         const [kelasId, mapelId] = selectedAssignment.split('-').map(Number);
         try {
           const studentsData = await guruApi.getStudentsInClass(kelasId, activeTASemester.id_ta_semester);
-          setStudentsInClass(studentsData);
+          
+          // Sort siswa berdasarkan nama (alfabetis)
+          const sortedStudents = studentsData.sort((a, b) => 
+            a.nama_siswa.localeCompare(b.nama_siswa, 'id', { sensitivity: 'base' })
+          );
+          
+          setStudentsInClass(sortedStudents);
           
           setGradesInput({});
           setTpColumns([1]);
@@ -430,6 +436,7 @@ const InputNilai = ({ activeTASemester, userId }) => {
     let tpSum = 0;
     let tpCount = 0;
     
+    // Hitung rata-rata TP yang terisi
     tpColumns.forEach(tpNum => {
       const tpValue = gradesInput[`${studentId}_TP${tpNum}`];
       if (tpValue !== undefined && tpValue !== null && tpValue !== '' && !isNaN(parseFloat(tpValue))) {
@@ -439,10 +446,13 @@ const InputNilai = ({ activeTASemester, userId }) => {
     });
     
     const tpAverage = tpCount > 0 ? tpSum / tpCount : 0;
+    
+    // Ambil nilai UAS
     const uasValue = gradesInput[`${studentId}_UAS`];
     const uas = (uasValue !== undefined && uasValue !== null && uasValue !== '' && !isNaN(parseFloat(uasValue))) 
       ? parseFloat(uasValue) : null;
     
+    // Hitung nilai akhir: 70% TP + 30% UAS
     if (tpCount > 0 && uas !== null) {
       return (tpAverage * 0.7 + uas * 0.3).toFixed(2);
     }
@@ -1064,7 +1074,7 @@ const InputNilai = ({ activeTASemester, userId }) => {
                       <div className="flex justify-between items-center">
                         <p className="text-sm text-gray-600">
                           <i className="fas fa-calculator mr-1"></i>
-                          <strong>Keterangan:</strong> Nilai Akhir = 70% rata-rata TP + 30% UAS
+                          <strong>Keterangan:</strong> Nilai Akhir = (70% × Rata-rata TP) + (30% × UAS)
                         </p>
                         <Button
                           type="submit"
