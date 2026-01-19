@@ -863,7 +863,11 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     }
     return a.localeCompare(b);
   });
-  const rekapTableData = Object.values(processedRekap);
+  
+  // Sort students alphabetically by name
+  const rekapTableData = Object.values(processedRekap).sort((a, b) => 
+    a.nama_siswa.localeCompare(b.nama_siswa, 'id', { sensitivity: 'base' })
+  );
 
   // Prepare columns for Table component
   const columns = [
