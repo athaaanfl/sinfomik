@@ -6,6 +6,7 @@
     import PWAInstallPrompt from './components/PWAInstallPrompt';
     import TokenExpiryWarning from './components/TokenExpiryWarning';
     import { ToastProvider } from './context/ToastContext';
+    import { SettingsProvider } from './context/SettingsContext';
 
     // ✅ VERSION MANAGEMENT - Update ini setiap deploy baru untuk auto clear cache
     const APP_VERSION = '2.0.2'; // Format: major.minor.patch
@@ -178,19 +179,20 @@
       }
 
       return (
-        <ToastProvider>
-          <Router>
-            <Routes>
-              {/* Route untuk halaman login */}
-              <Route path="/login" element={
-                isLoggedIn ? (
-                  // Jika sudah login, redirect ke dashboard yang sesuai
-                  <Navigate to={`/${userRole}-dashboard`} replace />
-                ) : (
-                  // Jika belum login, tampilkan halaman login
-                  <LoginPage onLogin={handleLogin} />
-                )
-              } />
+        <SettingsProvider>
+          <ToastProvider>
+            <Router>
+              <Routes>
+                {/* Route untuk halaman login */}
+                <Route path="/login" element={
+                  isLoggedIn ? (
+                    // Jika sudah login, redirect ke dashboard yang sesuai
+                    <Navigate to={`/${userRole}-dashboard`} replace />
+                  ) : (
+                    // Jika belum login, tampilkan halaman login
+                    <LoginPage onLogin={handleLogin} />
+                  )
+                } />
 
             {/* Route untuk dashboard Admin */}
             <Route path="/admin-dashboard" element={
@@ -229,8 +231,9 @@
           <PWAInstallPrompt />
         </Router>
       </ToastProvider>
-      );
-    }
+    </SettingsProvider>
+  );
+}
 
-    export default App;
+export default App;
     

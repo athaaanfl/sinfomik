@@ -520,6 +520,636 @@ const EditCapaianPembelajaranModal = ({ cp, onClose, onSave }) => {
   );
 };
 
+// Komponen Modal Add ATP Row Manual
+const AddAtpRowModal = ({ id_mapel, fase, nama_mapel, onClose, onSave }) => {
+  const [newRow, setNewRow] = useState({
+    Elemen: '',
+    'Capaian Pembelajaran (CP)': '',
+    'Tujuan Pembelajaran (TP)': '',
+    'Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)': '',
+    'Materi Pokok': '',
+    Kelas: '',
+    Semester: ''
+  });
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (field, value) => {
+    setNewRow(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    setMessageType('');
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/excel/atp/${id_mapel}/${fase}/add-row`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ row: newRow })
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        const now = Date.now();
+        const last = window.__lastAuthRedirect || 0;
+        if (now - last > 5000) {
+          window.__lastAuthRedirect = now;
+          window.location.replace('/login');
+        }
+        return;
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to add ATP row');
+      }
+
+      const result = await response.json();
+      setMessage(result.message || 'ATP row berhasil ditambahkan!');
+      setMessageType('success');
+      
+      setTimeout(() => {
+        onSave();
+        onClose();
+      }, 1500);
+    } catch (err) {
+      console.error('Error adding ATP row:', err);
+      setMessage(err.message);
+      setMessageType('error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col transform transition-all duration-300 overflow-auto">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 rounded-t-2xl flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-2xl font-bold text-white flex items-center">
+                <i className="fas fa-plus-circle mr-3 text-3xl"></i>
+                Tambah ATP Manual
+              </h3>
+              <p className="text-green-100 mt-2">{nama_mapel} - Fase {fase}</p>
+            </div>
+            <button 
+              onClick={onClose}
+              className="text-white hover:text-green-200 transition-colors duration-200 p-2 hover:bg-white/20 rounded-full"
+            >
+              <i className="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {/* Info Notice */}
+          <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
+            <div className="flex items-start gap-3">
+              <i className="fas fa-info-circle text-blue-500 text-xl mt-0.5"></i>
+              <div className="text-sm text-blue-800">
+                <p className="font-semibold mb-1">💡 Auto-Create Excel</p>
+                <p>Jika file Excel ATP belum ada untuk fase ini, sistem akan otomatis membuatkan file baru saat Anda menyimpan data pertama kali.</p>
+              </div>
+            </div>
+          </div>
+
+          {message && (
+            <StatusMessage 
+              type={messageType}
+              message={message}
+              className="mb-6"
+            />
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Elemen */}
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <i className="fas fa-cube mr-2 text-gray-500"></i>
+                  Elemen
+                </label>
+                <input
+                  type="text"
+                  value={newRow.Elemen}
+                  onChange={(e) => handleChange('Elemen', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="Contoh: Bilangan"
+                  required
+                />
+              </div>
+
+              {/* Materi Pokok */}
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <i className="fas fa-book-open mr-2 text-gray-500"></i>
+                  Materi Pokok
+                </label>
+                <input
+                  type="text"
+                  value={newRow['Materi Pokok']}
+                  onChange={(e) => handleChange('Materi Pokok', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="Contoh: Penjumlahan & Pengurangan"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Capaian Pembelajaran */}
+            <div className="form-group">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <i className="fas fa-bullseye mr-2 text-gray-500"></i>
+                Capaian Pembelajaran (CP)
+              </label>
+              <textarea
+                value={newRow['Capaian Pembelajaran (CP)']}
+                onChange={(e) => handleChange('Capaian Pembelajaran (CP)', e.target.value)}
+                rows="3"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Masukkan deskripsi capaian pembelajaran..."
+                required
+              />
+            </div>
+
+            {/* Tujuan Pembelajaran */}
+            <div className="form-group">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <i className="fas fa-target mr-2 text-gray-500"></i>
+                Tujuan Pembelajaran (TP)
+              </label>
+              <textarea
+                value={newRow['Tujuan Pembelajaran (TP)']}
+                onChange={(e) => handleChange('Tujuan Pembelajaran (TP)', e.target.value)}
+                rows="3"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Masukkan tujuan pembelajaran..."
+                required
+              />
+            </div>
+
+            {/* KKTP */}
+            <div className="form-group">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <i className="fas fa-check-circle mr-2 text-gray-500"></i>
+                Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)
+              </label>
+              <textarea
+                value={newRow['Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)']}
+                onChange={(e) => handleChange('Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)', e.target.value)}
+                rows="3"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                placeholder="Masukkan kriteria ketercapaian..."
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Kelas */}
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <i className="fas fa-users mr-2 text-gray-500"></i>
+                  Kelas
+                </label>
+                <select
+                  value={newRow.Kelas}
+                  onChange={(e) => handleChange('Kelas', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  required
+                >
+                  <option value="">Pilih Kelas</option>
+                  {fase === 'A' && (
+                    <>
+                      <option value="1">Kelas 1</option>
+                      <option value="2">Kelas 2</option>
+                    </>
+                  )}
+                  {fase === 'B' && (
+                    <>
+                      <option value="3">Kelas 3</option>
+                      <option value="4">Kelas 4</option>
+                    </>
+                  )}
+                  {fase === 'C' && (
+                    <>
+                      <option value="5">Kelas 5</option>
+                      <option value="6">Kelas 6</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Semester */}
+              <div className="form-group">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <i className="fas fa-calendar-alt mr-2 text-gray-500"></i>
+                  Semester
+                </label>
+                <select
+                  value={newRow.Semester}
+                  onChange={(e) => handleChange('Semester', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  required
+                >
+                  <option value="">Pilih Semester</option>
+                  <option value="1">Semester 1 (Ganjil)</option>
+                  <option value="2">Semester 2 (Genap)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-end pt-4 border-t">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onClose}
+                disabled={isSubmitting}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                variant="success"
+                icon={isSubmitting ? 'spinner' : 'save'}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Menyimpan...' : 'Simpan ATP'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Komponen Modal Pemetaan CP Viewer (Rise Up!)
+const PemetaanCpViewerModal = ({ fase, nama_mapel, onClose }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState(null);
+  const [selectedKelas, setSelectedKelas] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('1');
+  const [expandedTp, setExpandedTp] = useState({});
+
+  // Determine kelas options based on fase
+  const kelasOptions = fase === 'A' ? [1, 2] : fase === 'B' ? [3, 4] : [5, 6];
+
+  useEffect(() => {
+    setSelectedKelas(String(kelasOptions[0]));
+  }, [fase]);
+
+  useEffect(() => {
+    if (selectedKelas) fetchData();
+  }, [selectedKelas, selectedSemester]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/excel/pemetaan-cp/${selectedKelas}/${selectedSemester}`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.replace('/login');
+        return;
+      }
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Failed to fetch');
+      }
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleTp = (idx) => {
+    setExpandedTp(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const expandAll = () => {
+    if (!data) return;
+    const all = {};
+    data.elemenData.forEach((_, idx) => { all[idx] = true; });
+    setExpandedTp(all);
+  };
+
+  const collapseAll = () => setExpandedTp({});
+
+  // Group elemenData by elemen name
+  const groupedByElemen = data ? data.elemenData.reduce((acc, item, idx) => {
+    const key = item.elemen || 'Lainnya';
+    if (!acc[key]) acc[key] = { deskripsiCp: item.deskripsiCp, items: [] };
+    acc[key].items.push({ ...item, _idx: idx });
+    return acc;
+  }, {}) : {};
+
+  const getElemenColor = (elemen) => {
+    const lower = (elemen || '').toLowerCase();
+    if (lower.includes('menyimak') || lower.includes('berbicara')) return 'blue';
+    if (lower.includes('membaca') || lower.includes('memirsa')) return 'emerald';
+    if (lower.includes('menulis') || lower.includes('merepresentasi') || lower.includes('mempresentasi')) return 'purple';
+    return 'gray';
+  };
+
+  const getActivityBadge = (text) => {
+    const match = text.match(/^\[(\w+[^\]]*)\]/i);
+    if (!match) return null;
+    const type = match[1].trim();
+    const colors = {
+      'Vocabulary': 'bg-yellow-100 text-yellow-800',
+      'Listening': 'bg-blue-100 text-blue-800',
+      'Reading': 'bg-green-100 text-green-800',
+      'Speaking and Writing': 'bg-purple-100 text-purple-800',
+      'Language': 'bg-orange-100 text-orange-800',
+      'Activity': 'bg-pink-100 text-pink-800'
+    };
+    return { type, color: colors[type] || 'bg-gray-100 text-gray-800' };
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-teal-500 to-cyan-600 p-6 rounded-t-2xl flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-bold text-white flex items-center">
+                <i className="fas fa-map mr-3 text-3xl"></i>
+                Pemetaan CP - Rise Up!
+              </h3>
+              <p className="text-teal-100 mt-1">{nama_mapel} - Fase {fase}</p>
+            </div>
+            <button onClick={onClose} className="text-white hover:text-teal-200 p-2 hover:bg-white/20 rounded-full transition-colors">
+              <i className="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+
+          {/* Filters */}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <select
+              value={selectedKelas}
+              onChange={(e) => setSelectedKelas(e.target.value)}
+              className="px-4 py-2 rounded-lg bg-white/20 text-white border border-white/30 focus:ring-2 focus:ring-white/50"
+            >
+              {kelasOptions.map(k => (
+                <option key={k} value={k} className="text-gray-800">Kelas {k}</option>
+              ))}
+            </select>
+            <select
+              value={selectedSemester}
+              onChange={(e) => setSelectedSemester(e.target.value)}
+              className="px-4 py-2 rounded-lg bg-white/20 text-white border border-white/30 focus:ring-2 focus:ring-white/50"
+            >
+              <option value="1" className="text-gray-800">Semester 1 (Unit 1-6)</option>
+              <option value="2" className="text-gray-800">Semester 2 (Unit 7-12)</option>
+            </select>
+            <button onClick={expandAll} className="px-3 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 text-sm">
+              <i className="fas fa-expand-alt mr-1"></i> Expand All
+            </button>
+            <button onClick={collapseAll} className="px-3 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 text-sm">
+              <i className="fas fa-compress-alt mr-1"></i> Collapse All
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {loading && <LoadingSpinner message="Memuat data Pemetaan CP..." />}
+          {error && <StatusMessage type="error" message={error} />}
+
+          {!loading && !error && data && (
+            <div className="space-y-6">
+              {/* Capaian Umum */}
+              {data.capaianUmum && (
+                <div className="p-4 bg-gray-50 border-l-4 border-teal-500 rounded-r-lg">
+                  <h4 className="font-semibold text-gray-800 mb-1"><i className="fas fa-bullseye mr-2 text-teal-500"></i>Capaian Umum Fase {data.fase}</h4>
+                  <p className="text-sm text-gray-600 leading-relaxed">{data.capaianUmum}</p>
+                </div>
+              )}
+
+              {/* Units overview */}
+              {data.units && data.units.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {data.units.map(u => (
+                    <span key={u.unitNumber} className="px-3 py-1 bg-teal-50 text-teal-700 rounded-full text-xs font-medium border border-teal-200">
+                      {u.unitName}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Elemen sections */}
+              {Object.entries(groupedByElemen).map(([elemenName, group]) => {
+                const color = getElemenColor(elemenName);
+                return (
+                  <div key={elemenName} className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className={`bg-${color}-50 border-b border-${color}-200 p-4`}>
+                      <h4 className={`font-bold text-${color}-800 text-lg flex items-center`}>
+                        <i className={`fas fa-${elemenName.toLowerCase().includes('menyimak') ? 'headphones' : elemenName.toLowerCase().includes('membaca') ? 'book-reader' : 'pen-fancy'} mr-2`}></i>
+                        {elemenName}
+                      </h4>
+                      {group.deskripsiCp && (
+                        <p className={`text-sm text-${color}-600 mt-2 leading-relaxed`}>{group.deskripsiCp}</p>
+                      )}
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {group.items.map((item, tpIdx) => (
+                        <div key={item._idx} className="bg-white">
+                          {/* TP Header - clickable */}
+                          <button
+                            onClick={() => toggleTp(item._idx)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className={`flex-shrink-0 w-8 h-8 rounded-full bg-${color}-100 text-${color}-700 flex items-center justify-center text-sm font-bold`}>
+                                {tpIdx + 1}
+                              </span>
+                              <span className="text-sm text-gray-800 font-medium line-clamp-2">{item.tpText}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              <span className="text-xs text-gray-400">{item.atpPerUnit.length} unit</span>
+                              <i className={`fas fa-chevron-${expandedTp[item._idx] ? 'up' : 'down'} text-gray-400`}></i>
+                            </div>
+                          </button>
+
+                          {/* ATP Details - expandable */}
+                          {expandedTp[item._idx] && item.atpPerUnit.length > 0 && (
+                            <div className="px-4 pb-4 pt-1">
+                              <div className="grid gap-3">
+                                {item.atpPerUnit.map((atp, atpIdx) => (
+                                  <div key={atpIdx} className="ml-11 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-semibold">
+                                        {atp.unitName}
+                                      </span>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      {atp.detail.split('\n').filter(line => line.trim()).map((line, lineIdx) => {
+                                        const badge = getActivityBadge(line.trim());
+                                        return (
+                                          <div key={lineIdx} className="flex items-start gap-2">
+                                            {badge && (
+                                              <span className={`${badge.color} px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 mt-0.5`}>
+                                                {badge.type}
+                                              </span>
+                                            )}
+                                            <span className="text-sm text-gray-700 leading-relaxed">
+                                              {badge ? line.trim().replace(/^\[[^\]]+\]\s*/, '') : line.trim()}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {Object.keys(groupedByElemen).length === 0 && (
+                <EmptyState
+                  icon="map"
+                  title="Tidak Ada Data"
+                  message={`Tidak ada data pemetaan CP untuk Kelas ${selectedKelas} Semester ${selectedSemester}.`}
+                />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center flex-shrink-0">
+          <div className="text-sm text-gray-500">
+            {data && <span>{data.totalTp} Tujuan Pembelajaran | {data.units?.length || 0} Unit</span>}
+          </div>
+          <Button variant="secondary" onClick={onClose}>Tutup</Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Komponen Import Pemetaan CP (Rise Up!)
+const ImportPemetaanCp = ({ onImportSuccess }) => {
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+    setMessage('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!file) {
+      setMessage('Pilih file Excel Pemetaan CP terlebih dahulu');
+      setMessageType('error');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/excel/import-pemetaan-cp`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.replace('/login');
+        return;
+      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Gagal import');
+      setMessage(data.message);
+      setMessageType('success');
+      onImportSuccess();
+      setFile(null);
+      e.target.reset();
+    } catch (err) {
+      setMessage(err.message);
+      setMessageType('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <FormSection
+      title="Import Pemetaan CP (Rise Up! - Bahasa Inggris)"
+      icon="map"
+      variant="info"
+    >
+      <div className="mb-4 p-4 bg-teal-50 border border-teal-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <i className="fas fa-info-circle text-teal-500 text-xl flex-shrink-0 mt-0.5"></i>
+          <div className="text-sm text-teal-800">
+            <p className="font-semibold mb-1">Format File Pemetaan CP Rise Up!</p>
+            <p>File Excel harus berisi sheet bernama <b>"Book 1"</b> sampai <b>"Book 6"</b>. Setiap Book mewakili satu kelas (Book 1 = Kelas 1, dst). Unit 1-6 = Semester 1, Unit 7-12 = Semester 2.</p>
+            <ul className="mt-2 list-disc list-inside space-y-1 text-teal-700">
+              <li>Book 1 &amp; 2 → Kelas 1 &amp; 2 (Fase A)</li>
+              <li>Book 3 &amp; 4 → Kelas 3 &amp; 4 (Fase B)</li>
+              <li>Book 5 &amp; 6 → Kelas 5 &amp; 6 (Fase C)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileChange}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
+          />
+          <Button
+            type="submit"
+            variant="info"
+            icon={loading ? 'spinner' : 'upload'}
+            disabled={loading}
+            className="whitespace-nowrap w-full sm:w-auto"
+          >
+            {loading ? 'Importing...' : 'Import Pemetaan CP'}
+          </Button>
+        </div>
+        {message && <StatusMessage type={messageType} message={message} />}
+      </form>
+    </FormSection>
+  );
+};
+
 // Komponen Import Excel
 const ImportExcel = ({ onImportSuccess }) => {
   const [file, setFile] = useState(null);
@@ -672,7 +1302,11 @@ const CapaianPembelajaranManagement = () => {
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [showAtpModal, setShowAtpModal] = useState(false);
   const [selectedAtpData, setSelectedAtpData] = useState(null);
+  const [showAddAtpModal, setShowAddAtpModal] = useState(false);
+  const [addAtpData, setAddAtpData] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, cp: null });
+  const [showPemetaanModal, setShowPemetaanModal] = useState(false);
+  const [pemetaanData, setPemetaanData] = useState(null);
 
   const fetchCpsAndMapel = async () => {
     setLoading(true);
@@ -758,6 +1392,26 @@ const CapaianPembelajaranManagement = () => {
   const handleViewAtpClick = (id_mapel, fase, nama_mapel) => {
     setSelectedAtpData({ id_mapel, fase, nama_mapel });
     setShowAtpModal(true);
+  };
+
+  const handleAddAtpClick = (id_mapel, fase, nama_mapel) => {
+    setAddAtpData({ id_mapel, fase, nama_mapel });
+    setShowAddAtpModal(true);
+  };
+
+  const handleAddAtpSuccess = () => {
+    fetchCpsAndMapel();
+  };
+
+  const handleViewPemetaanCp = (fase, nama_mapel) => {
+    setPemetaanData({ fase, nama_mapel });
+    setShowPemetaanModal(true);
+  };
+
+  // Helper: check if a mapel is Bahasa Inggris
+  const isBahasaInggris = (nama_mapel) => {
+    const lower = (nama_mapel || '').toLowerCase();
+    return lower.includes('inggris') || lower.includes('english');
   };
 
   const filteredCps = cps.filter(cp => {
@@ -869,6 +1523,9 @@ const CapaianPembelajaranManagement = () => {
         <>
           {/* Import Excel Section */}
           <ImportExcel onImportSuccess={fetchCpsAndMapel} />
+
+          {/* Import Pemetaan CP (Rise Up!) */}
+          <ImportPemetaanCp onImportSuccess={fetchCpsAndMapel} />
 
           {/* Add CP Form */}
           <FormSection 
@@ -1023,6 +1680,24 @@ const CapaianPembelajaranManagement = () => {
                                       </h4>
                                       {cpFase && (
                                         <div className="flex flex-wrap gap-2">
+                                          {isBahasaInggris(mapel.nama_mapel) && (
+                                            <Button
+                                              variant="info"
+                                              icon="map"
+                                              size="sm"
+                                              onClick={() => handleViewPemetaanCp(fase, mapel.nama_mapel)}
+                                            >
+                                              Pemetaan CP
+                                            </Button>
+                                          )}
+                                          <Button
+                                            variant="success"
+                                            icon="plus"
+                                            size="sm"
+                                            onClick={() => handleAddAtpClick(mapel.id_mapel, fase, mapel.nama_mapel)}
+                                          >
+                                            Tambah ATP Manual
+                                          </Button>
                                           <Button
                                             variant="info"
                                             icon="table"
@@ -1086,6 +1761,26 @@ const CapaianPembelajaranManagement = () => {
           fase={selectedAtpData.fase}
           nama_mapel={selectedAtpData.nama_mapel}
           onClose={() => setShowAtpModal(false)}
+        />
+      )}
+
+      {/* Add ATP Row Modal */}
+      {showAddAtpModal && addAtpData && (
+        <AddAtpRowModal
+          id_mapel={addAtpData.id_mapel}
+          fase={addAtpData.fase}
+          nama_mapel={addAtpData.nama_mapel}
+          onClose={() => setShowAddAtpModal(false)}
+          onSave={handleAddAtpSuccess}
+        />
+      )}
+
+      {/* Pemetaan CP Viewer Modal */}
+      {showPemetaanModal && pemetaanData && (
+        <PemetaanCpViewerModal
+          fase={pemetaanData.fase}
+          nama_mapel={pemetaanData.nama_mapel}
+          onClose={() => setShowPemetaanModal(false)}
         />
       )}
 

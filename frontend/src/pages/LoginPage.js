@@ -3,14 +3,23 @@ import React, { useState, useEffect } from 'react';
 import { loginUser } from '../api/auth'; // Import fungsi login dari API
 import feather from 'feather-icons';
 import './LoginPage.css';
+import { useSettings } from '../context/SettingsContext';
 
 function LoginPage({ onLogin }) {
+  const { settings } = useSettings();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('admin'); // Default ke admin
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' atau 'error'
   const [showPassword, setShowPassword] = useState(false);
+
+  // Get API URL for images
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+  const getImageUrl = (path) => {
+    if (!path) return '';
+    return path.startsWith('/uploads/') ? `${apiUrl}${path}` : path;
+  };
 
   useEffect(() => {
     // Initialize feather icons
@@ -87,37 +96,45 @@ function LoginPage({ onLogin }) {
           <div className="max-w-5xl mx-auto">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               {/* Left Side - Hero Image */}
-            <div className="hidden md:block rounded-3xl overflow-hidden shadow-2xl relative transform hover:scale-[1.02] transition-transform duration-500">
-              <img src="\bglogin.jpg" alt="Sekolah Binekas" className="w-full h-[500px] object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/80 via-indigo-600/40 to-transparent"></div>
-              <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                <div className="backdrop-blur-sm bg-white/10 rounded-2xl p-6">
-                  <h2 className="text-3xl font-bold mb-2">Sekolah Binekas</h2>
-                  <p className="text-lg opacity-90">Membangun Generasi Cerdas dan Berkarakter</p>
-                  <div className="flex gap-4 mt-4">
-                    <div className="flex items-center gap-2">
-                      <i data-feather="award" className="w-5 h-5"></i>
-                      <span className="text-sm">Akreditasi A</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <i data-feather="users" className="w-5 h-5"></i>
-                      <span className="text-sm">1000+ Siswa</span>
+              <div className="hidden md:block rounded-3xl overflow-hidden shadow-2xl relative transform hover:scale-[1.02] transition-transform duration-500">
+                <img 
+                  src={getImageUrl(settings.login_background) || "/bglogin.jpg"} 
+                  alt={settings.school_name || "Sekolah Binekas"} 
+                  className="w-full h-[500px] object-cover" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/80 via-indigo-600/40 to-transparent"></div>
+                <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+                  <div className="backdrop-blur-sm bg-white/10 rounded-2xl p-6">
+                    <h2 className="text-3xl font-bold mb-2">{settings.school_name || 'Sekolah Binekas'}</h2>
+                    <p className="text-lg opacity-90">{settings.login_tagline || 'Membangun Generasi Cerdas dan Berkarakter'}</p>
+                    <div className="flex gap-4 mt-4">
+                      <div className="flex items-center gap-2">
+                        <i data-feather="award" className="w-5 h-5"></i>
+                        <span className="text-sm">Akreditasi A</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <i data-feather="users" className="w-5 h-5"></i>
+                        <span className="text-sm">1000+ Siswa</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* Right Side - Login Form */}
             <div className="bg-white/95 backdrop-blur-md p-10 rounded-3xl shadow-2xl login-card border border-white/20">
               <div className="text-center mb-8">
                 <div className="inline-block p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-                  <img src="\logo-binekas.png" alt="School Logo" className="w-16 h-16 rounded-xl object-cover" />
+                  <img 
+                    src={getImageUrl(settings.school_logo) || "/logo-binekas.png"} 
+                    alt={`${settings.school_name || 'School'} Logo`} 
+                    className="w-16 h-16 rounded-xl object-cover" 
+                  />
                 </div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mt-4">
                   Portal Login
                 </h1>
-                <p className="text-gray-600 mt-2 font-medium">Sistem Informasi Akademik</p>
+                <p className="text-gray-600 mt-2 font-medium">{settings.login_subtitle || 'Sistem Informasi Akademik'}</p>
               </div>
 
               <div className="flex justify-center gap-4 mb-8">

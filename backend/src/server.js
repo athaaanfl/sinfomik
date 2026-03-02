@@ -19,6 +19,7 @@ const excelRoutes = require('./routes/excelRoutes');
 const gradeRoutes = require('./routes/gradeRoutes');
 const kkmRoutes = require('./routes/kkmRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000; // Gunakan port dari .env atau default 5000
@@ -102,11 +103,11 @@ app.use(cors(corsOptions));
 // Cookie parser untuk HTTP-only cookies
 app.use(cookieParser());
 
-// 3. Rate Limiting - Prevent brute force attacks
-// IMPROVED: Much stricter limits to prevent DDoS
+// 3. Rate Limiting - VERY RELAXED for bulk data import
+// UPDATED: Extremely high limits untuk keperluan input data massal
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 1000 : 2000), // 1000 for prod, 2000 for dev
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 500000000000 : 1000000000), // 50k for prod, 100k for dev
     message: {
         error: 'Too many requests',
         message: 'Anda telah mencapai batas request. Silakan tunggu beberapa saat sebelum mencoba lagi.',
@@ -137,10 +138,10 @@ app.use('/api', (req, res, next) => {
     next();
 });
 
-// Stricter rate limit for auth routes
+// Relaxed rate limit for auth routes - untuk bulk operations
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || (process.env.NODE_ENV === 'production' ? 100 : 200), // 100 for prod, 200 for dev
+    max: parseInt(process.env.AUTH_RATE_LIMIT_MAX) || (process.env.NODE_ENV === 'production' ? 1000000000000 : 20000000000000), // 10k for prod, 20k for dev
     message: 'Terlalu banyak percobaan login. Silakan coba lagi setelah 15 menit.',
     skipSuccessfulRequests: true, // Don't count successful requests
     handler: (req, res) => {
@@ -152,11 +153,11 @@ const authLimiter = rateLimit({
     }
 });
 
-// ADDED: Very strict limit for expensive operations (analytics, exports)
+// UPDATED: Very relaxed limit for expensive operations - untuk bulk data
 // Note: File uploads have separate concurrency control via multer + queue
 const expensiveOpLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
-    max: process.env.NODE_ENV === 'production' ? 30 : 100, // 30 requests per 5 min in production, 100 in dev
+    max: process.env.NODE_ENV === 'production' ? 50000000000 : 10000000000, // 5k requests per 5 min in production, 10k in dev
     message: 'Operasi ini memerlukan banyak sumber daya. Silakan tunggu beberapa saat.',
     handler: (req, res) => {
         console.warn(`🚨 Expensive operation limit exceeded for IP: ${req.ip} on ${req.path}`);
@@ -168,10 +169,10 @@ const expensiveOpLimiter = rateLimit({
     }
 });
 
-// ADDED: Moderate limit for general read operations
+// UPDATED: Very relaxed limit for general read operations - untuk bulk data
 const readLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
-    max: process.env.NODE_ENV === 'production' ? 200 : 500, // 200 per minute in production, 500 in dev
+    max: process.env.NODE_ENV === 'production' ? 10000000000000 : 20000000000000, // 10k per minute in production, 20k in dev
     message: 'Terlalu banyak permintaan. Silakan tunggu sebentar.',
 });
 
@@ -181,7 +182,8 @@ const readLimiter = rateLimit({
 app.use(express.json({ limit: process.env.MAX_JSON_SIZE || '10mb' })); // Allow large JSON for Excel data
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Allow large form data
 
-// Special handling for file uploads (will be handled by multer in routes)
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ===============================
 // ROUTES
@@ -200,6 +202,7 @@ app.use('/api/admin', readLimiter, moderateQueueMiddleware, adminRoutes);
 app.use('/api/guru', readLimiter, moderateQueueMiddleware, guruRoutes);
 app.use('/api/grades', readLimiter, moderateQueueMiddleware, gradeRoutes);
 app.use('/api/kkm', readLimiter, moderateQueueMiddleware, kkmRoutes);
+app.use('/api/settings', readLimiter, moderateQueueMiddleware, settingsRoutes);
 
 // Health check endpoint (before static files)
 app.get('/health', (req, res) => {

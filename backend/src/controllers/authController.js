@@ -1,5 +1,6 @@
 // backend/src/controllers/authController.js
 const { getDb } = require('../config/db');
+const { getPool } = require('../config/db_postgres');
 const { createHash } = require('crypto'); // Untuk hashing SHA256 (sesuai data dummy Python)
 const bcrypt = require('bcryptjs'); // Untuk membandingkan hash password (jika menggunakan bcrypt)
 const jwt = require('jsonwebtoken'); // Untuk JWT authentication
@@ -26,6 +27,29 @@ exports.login = (req, res) => {
     }
 
     const handleSuccessfulLogin = async (authSource, authId, displayName, roleForToken, password_hash_field_present) => {
+        // Check maintenance mode before allowing login (except for superadmin)
+        try {
+            const pool = getPool();
+            const maintenanceResult = await pool.query('SELECT maintenance_mode, maintenance_message FROM app_settings WHERE id = 1');
+            
+            if (maintenanceResult.rows.length > 0) {
+                const { maintenance_mode, maintenance_message } = maintenanceResult.rows[0];
+                
+                // Block login if maintenance mode is active and user is not superadmin
+                if (maintenance_mode && roleForToken !== 'superadmin') {
+                    const message = maintenance_message || 'Sistem sedang dalam maintenance. Silakan coba lagi nanti.';
+                    return res.status(503).json({ 
+                        success: false,
+                        message: message,
+                        maintenanceMode: true
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('Error checking maintenance mode:', err);
+            // Continue with login if we can't check maintenance mode
+        }
+
         // Generate token with role and auth information
         const payload = {
             id: authId,
@@ -179,6 +203,29 @@ exports.login = (req, res) => {
 
             if (!isPasswordValid) {
                 return res.status(401).json({ message: 'Username atau password salah.' });
+            }
+
+            // Check maintenance mode before allowing guru login
+            try {
+                const pool = getPool();
+                const maintenanceResult = await pool.query('SELECT maintenance_mode, maintenance_message FROM app_settings WHERE id = 1');
+                
+                if (maintenanceResult.rows.length > 0) {
+                    const { maintenance_mode, maintenance_message } = maintenanceResult.rows[0];
+                    
+                    // Block all guru logins during maintenance mode
+                    if (maintenance_mode) {
+                        const message = maintenance_message || 'Sistem sedang dalam maintenance. Silakan coba lagi nanti.';
+                        return res.status(503).json({ 
+                            success: false,
+                            message: message,
+                            maintenanceMode: true
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Error checking maintenance mode (guru):', err);
+                // Continue with login if we can't check maintenance mode
             }
 
             // Generate basic JWT for guru users

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx-js-style';
 
-export function exportAnalysisToExcel({ subjectName, className, questionKeys, students, answers, weights, scale, analysisResults, cronbachAlpha, semValue }) {
+export function exportAnalysisToExcel({ subjectName, className, questionKeys, students, answers, weights, scale, analysisResults, cronbachAlpha, semValue, selectedTpAnalysis }) {
   const wb = XLSX.utils.book_new();
   const data = [];
 
@@ -309,7 +309,11 @@ export function exportAnalysisToExcel({ subjectName, className, questionKeys, st
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const filename = `analisis_soal_${subjectName || className || 'analysis'}_${new Date().getTime()}.xlsx`;
+  // Format: Analisis_{MapelName}_{TP/UAS}_{ClassName}
+  const cleanSubject = (subjectName || 'Mapel').replace(/[^a-zA-Z0-9]/g, '');
+  const cleanClass = (className || 'Kelas').replace(/[^a-zA-Z0-9]/g, '');
+  const tpLabel = selectedTpAnalysis || 'UAS';
+  const filename = `Analisis_${cleanSubject}_${tpLabel}_${cleanClass}.xlsx`;
   a.download = filename;
   document.body.appendChild(a);
   a.click();

@@ -19,6 +19,8 @@ import RekapNilai from '../features/guru/rekapNilai';
 import WaliKelasGradeView from '../features/guru/WaliKelasGradeView';
 // import GuruAnalytics from '../features/guru/analytics'; // DISABLED - Merged into WaliKelasGradeView
 import ChangePassword from '../features/guru/changePassword';
+import Settings from '../features/admin/settings';
+import AnnouncementPopup from '../components/AnnouncementPopup';
 
 import * as adminApi from '../api/admin';
 import * as guruApi from '../api/guru';
@@ -169,6 +171,7 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
         { name: "Penugasan Guru ke Mapel & Kelas", key: "penugasan-guru-mapel-kelas", component: TeacherClassEnroll, icon: "fas fa-tasks" },
         { name: "Pindah Semester Kelas", key: "pindah-semester-kelas", component: ClassPromote, icon: "fas fa-level-up-alt" },
         { name: "Analytics & Laporan", key: "analytics", component: AdminAnalytics, icon: "fas fa-chart-line" },
+        { name: "Pengaturan Sistem", key: "settings", component: Settings, icon: "fas fa-cog", superAdminOnly: true },
     ];
 
     const guruMenuItems = [
@@ -450,6 +453,9 @@ function DashboardPage({ userRole, username, userId, onLogout, isSuperAdmin }) {
                     </div>
                 )}
             </div>
+            
+            {/* Announcement Popup */}
+            <AnnouncementPopup />
         </div>
     );
 }

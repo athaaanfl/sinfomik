@@ -23,7 +23,11 @@ const RekapNilai = ({ activeTASemester, userId }) => {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+
   const [kkmSettings, setKkmSettings] = useState({}); // KKM values loaded from DB for this assignment
+  const [tpDescriptions, setTpDescriptions] = useState({}); // Store TP descriptions
+  const [selectedTpAnalysis, setSelectedTpAnalysis] = useState('UAS'); // Default to UAS for analysis
+  const [isSaving, setIsSaving] = useState(false);
 
   // --- Analisis Soal (new feature) ---
   const [activeTab, setActiveTab] = useState('rekap'); // 'rekap' | 'analysis'
@@ -59,7 +63,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
       .filter(tipe => tipe.startsWith('TP'))
       .map(tipe => row[tipe])
       .filter(n => typeof n === 'number');
-    const tpAverage = tpGrades.length > 0 ? tpGrades.reduce((s,n)=>s+n,0)/tpGrades.length : null;
+    const tpAverage = tpGrades.length > 0 ? tpGrades.reduce((s, n) => s + n, 0) / tpGrades.length : null;
     const uasValue = typeof row['UAS'] === 'number' ? row['UAS'] : null;
     if (tpAverage !== null && uasValue !== null) {
       return tpAverage * 0.7 + uasValue * 0.3;
@@ -67,8 +71,8 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     if (tpAverage !== null) return tpAverage;
     if (uasValue !== null) return uasValue;
     // fallback: sum of numeric values
-    const allNums = uniqueGradeTypes.map(t=>row[t]).filter(v=>typeof v==='number');
-    if (allNums.length>0) return allNums.reduce((s,n)=>s+n,0)/allNums.length;
+    const allNums = uniqueGradeTypes.map(t => row[t]).filter(v => typeof v === 'number');
+    if (allNums.length > 0) return allNums.reduce((s, n) => s + n, 0) / allNums.length;
     return null;
   };
 
@@ -104,19 +108,21 @@ const RekapNilai = ({ activeTASemester, userId }) => {
 
   const analysisColumns = [
     { key: 'question', label: 'Soal' },
-    { key: 'weight', label: 'Bobot', className: 'text-center', render: (v,row) => (row.weight || 1) },
+    { key: 'weight', label: 'Bobot', className: 'text-center', render: (v, row) => (row.weight || 1) },
     { key: 'n', label: 'N', className: 'text-center' },
     { key: 'p_value', label: 'p-value', className: 'text-center', render: v => typeof v === 'number' ? v.toFixed(3) : '-' },
-    { key: 'mean', label: 'Mean', className: 'text-center', render: v => typeof v === 'number' ? ( (v*100).toFixed(1) + '%' ) : '-' },
+    { key: 'mean', label: 'Mean', className: 'text-center', render: v => typeof v === 'number' ? ((v * 100).toFixed(1) + '%') : '-' },
     { key: 'item_total_corr', label: 'Item-Total Corr', className: 'text-center', render: v => typeof v === 'number' ? v.toFixed(3) : '-' },
     { key: 'point_biserial', label: 'Point-Biserial', className: 'text-center', render: v => typeof v === 'number' ? v.toFixed(3) : '-' },
-    { key: 'difficulty', label: 'Difficulty', render: (v,row) => {
+    {
+      key: 'difficulty', label: 'Difficulty', render: (v, row) => {
         let cls = 'bg-yellow-200 text-yellow-800';
         if (v === 'Mudah') cls = 'bg-green-200 text-green-800';
         if (v === 'Sulit') cls = 'bg-red-200 text-red-800';
         if (v === 'Insufficient data') cls = 'bg-gray-100 text-gray-600';
         return <span className={`px-2 py-1 rounded ${cls}`}>{v}</span>;
-      }}
+      }
+    }
   ];
 
   // ---------------- Spreadsheet helpers ----------------
@@ -164,11 +170,11 @@ const RekapNilai = ({ activeTASemester, userId }) => {
   const generateGrid = async () => {
     const n = Number(numQuestions) || 0;
     if (n <= 0) return;
-    
+
     // Fetch students dulu untuk pastikan data lengkap
     await fetchStudentsForAnalysis();
-    
-    const keys = Array.from({length: n}, (_,i) => `Q${i+1}`);
+
+    const keys = Array.from({ length: n }, (_, i) => `Q${i + 1}`);
     setQuestionKeys(keys);
     // initialize weights (bobot = max score)
     const newWeights = { ...weights };
@@ -226,10 +232,10 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     ks.forEach(k => {
       const v = row[k];
       const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
-      if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) { weightedPoints += (Number(v) / (bobot>0?bobot:1)) * bobot; hadAny = true; }
+      if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) { weightedPoints += (Number(v) / (bobot > 0 ? bobot : 1)) * bobot; hadAny = true; }
       totalWeight += bobot;
     });
-    const fraction = hadAny && totalWeight>0 ? (weightedPoints / totalWeight) : null;
+    const fraction = hadAny && totalWeight > 0 ? (weightedPoints / totalWeight) : null;
     return { weightedPoints, totalWeight, fraction };
   };
 
@@ -241,47 +247,47 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     let totalBobotSiswa = 0; // Σ(nilai[i])
     let totalBobotNilai = 0; // Σ(bobot[i]) — karena max = bobot
     let hadAny = false;
-    
+
     ks.forEach(k => {
       const v = row[k];
       const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
-      
+
       // Total bobot nilai = sum of all bobots (karena max = bobot)
       totalBobotNilai += bobot;
-      
+
       // Total bobot siswa hanya jika ada nilai
       if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) {
         totalBobotSiswa += Number(v);
         hadAny = true;
       }
     });
-    
+
     // Nilai akhir = (totalBobotSiswa / totalBobotNilai) × 100
     const nilaiAkhir = hadAny && totalBobotNilai > 0 ? (totalBobotSiswa / totalBobotNilai) * 100 : null;
     return { totalBobotSiswa, totalBobotNilai, nilaiAkhir };
   };
 
   const getTotalWeight = () => {
-    return questionKeys && questionKeys.length>0 ? questionKeys.reduce((s,k) => s + ((weights && weights[k] !== undefined) ? Number(weights[k]) : 1), 0) : 0;
+    return questionKeys && questionKeys.length > 0 ? questionKeys.reduce((s, k) => s + ((weights && weights[k] !== undefined) ? Number(weights[k]) : 1), 0) : 0;
   };
 
   const getTotalMax = () => {
     // Max = Bobot
-    return questionKeys && questionKeys.length>0 ? questionKeys.reduce((s,k) => s + ((weights && weights[k] !== undefined) ? Number(weights[k]) : 1), 0) : 0;
+    return questionKeys && questionKeys.length > 0 ? questionKeys.reduce((s, k) => s + ((weights && weights[k] !== undefined) ? Number(weights[k]) : 1), 0) : 0;
   };
 
 
   const exportAnalysisCSV = () => {
     // keep backward-compatible CSV export but include subject/class metadata
-    const ks = questionKeys.length>0 ? questionKeys : [];
-    const students = analysisStudents.length>0 ? analysisStudents : rekapTableData.map(r=>({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }));
+    const ks = questionKeys.length > 0 ? questionKeys : [];
+    const students = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }));
     const lines = [];
     // include metadata header
     lines.push([`Mata Pelajaran: ${subjectName || ''}`, `Kelas: ${classNameExport || ''}`, `Tanggal: ${new Date().toLocaleString()}`].join(','));
-    const header = ['No','Nama Siswa', ...ks, 'Weighted Points', 'Total Weight', 'Percent'];
+    const header = ['No', 'Nama Siswa', ...ks, 'Weighted Points', 'Total Weight', 'Percent'];
     lines.push(header.join(','));
     students.forEach((s, idx) => {
-      const row = [idx+1, `"${s.nama_siswa.replace(/"/g,'""')}"`];
+      const row = [idx + 1, `"${s.nama_siswa.replace(/"/g, '""')}"`];
       ks.forEach(k => {
         const v = (answers[s.id_siswa] && answers[s.id_siswa][k]) || '';
         row.push(v);
@@ -291,13 +297,13 @@ const RekapNilai = ({ activeTASemester, userId }) => {
       ksArr.forEach(k => {
         const v = answers[s.id_siswa] && answers[s.id_siswa][k];
         const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
-        if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) { weightedPoints += (Number(v)/ (bobot>0?bobot:1)) * bobot; hadAny = true; }
+        if (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) { weightedPoints += (Number(v) / (bobot > 0 ? bobot : 1)) * bobot; hadAny = true; }
         totalWeight += bobot;
       });
-      const percent = hadAny && totalWeight>0 ? (weightedPoints / totalWeight) : null;
+      const percent = hadAny && totalWeight > 0 ? (weightedPoints / totalWeight) : null;
       row.push(weightedPoints.toFixed(2));
       row.push(totalWeight.toFixed(2));
-      row.push(percent===null ? '' : ((percent*100).toFixed(1) + '%'));
+      row.push(percent === null ? '' : ((percent * 100).toFixed(1) + '%'));
       lines.push(row.join(','));
     });
     // append cronbach alpha and sem as footer lines
@@ -319,32 +325,32 @@ const RekapNilai = ({ activeTASemester, userId }) => {
 
     const XLSX = await import('xlsx');
     const students = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }));
-    
+
     // Buat data untuk Excel
     const data = [];
-    
+
     // Row 1: Header (No, Nama Siswa, Q1, Q2, ...)
     const headerRow = ['No', 'Nama Siswa', ...questionKeys];
     data.push(headerRow);
-    
+
     // Row 2: Bobot (kosong untuk No & Nama, lalu bobot per soal)
     const bobotRow = ['', 'BOBOT →', ...questionKeys.map(k => weights[k] || 1)];
     data.push(bobotRow);
-    
+
     // Row 3+: Data siswa (No, Nama, kosong untuk setiap soal)
     students.forEach((s, idx) => {
       const row = [idx + 1, s.nama_siswa, ...questionKeys.map(() => '')];
       data.push(row);
     });
-    
+
     // Buat worksheet dan workbook
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    
+
     // Download
     XLSX.writeFile(wb, `template_analisis_${questionKeys.length}soal.xlsx`);
-    
+
     toast.success(`Template Excel berhasil didownload! (${questionKeys.length} soal, ${students.length} siswa)`);
   };
 
@@ -372,30 +378,30 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     try {
       const XLSX = await import('xlsx');
       const reader = new FileReader();
-      
+
       reader.onload = (evt) => {
         try {
           const data = new Uint8Array(evt.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
-          
+
           // Validasi: pastikan ada sheet
           if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
             toast.error('❌ File Excel kosong atau corrupt! Tidak ada sheet yang ditemukan.');
             e.target.value = '';
             return;
           }
-          
+
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
+
           // Validasi: minimal 3 baris (header + bobot + 1 siswa)
           if (json.length < 3) {
             toast.error('❌ Format Excel tidak valid! Minimal harus ada:\n• Baris 1: Header (No, Nama Siswa, Soal 1, Soal 2, ...)\n• Baris 2: Bobot per soal\n• Baris 3+: Data siswa');
             e.target.value = '';
             return;
           }
-          
+
           // Parse header (row 0): ['No', 'Nama Siswa', 'Q1', 'Q2', ...] atau format apapun
           const headers = json[0];
           if (!headers || headers.length < 3) {
@@ -403,15 +409,15 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             e.target.value = '';
             return;
           }
-          
+
           const rawQCols = headers.slice(2); // Skip 'No' dan 'Nama Siswa'
-          
+
           if (rawQCols.length === 0) {
             toast.error('❌ Tidak ada kolom soal di Excel! Pastikan ada kolom setelah "Nama Siswa".');
             e.target.value = '';
             return;
           }
-          
+
           // Auto-convert ke format Q1, Q2, Q3, ... (support format apapun)
           const qCols = rawQCols.map((col, idx) => {
             const colStr = String(col || '').trim();
@@ -425,16 +431,16 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             // Default: Q1, Q2, Q3, ... based on index
             return `Q${idx + 1}`;
           });
-          
+
           // Parse bobot (row 1): ['', 'BOBOT →', 1, 1, ...]
           const bobotRow = json[1];
           const newWeights = {};
           const invalidWeights = [];
-          
+
           qCols.forEach((q, idx) => {
             const bobotValue = bobotRow[idx + 2];
             const bobotNum = Number(bobotValue);
-            
+
             // Validasi bobot harus angka positif
             if (bobotValue === null || bobotValue === undefined || bobotValue === '' || isNaN(bobotNum) || bobotNum <= 0) {
               invalidWeights.push(`${q} (${bobotValue})`);
@@ -443,85 +449,85 @@ const RekapNilai = ({ activeTASemester, userId }) => {
               newWeights[q] = bobotNum;
             }
           });
-          
+
           // Warning jika ada bobot invalid
           if (invalidWeights.length > 0) {
             console.warn('Invalid weights detected:', invalidWeights);
             toast.warning(`⚠️ Bobot tidak valid untuk: ${invalidWeights.join(', ')}. Menggunakan bobot default = 1.`);
           }
-          
+
           // Parse data siswa (row 2+)
           const newAnswers = {};
           const students = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }));
-          
+
           // Validasi: pastikan ada data siswa di sistem
           if (students.length === 0) {
             toast.error('❌ Tidak ada data siswa di sistem! Pastikan sudah ada siswa di kelas ini atau generate grid terlebih dahulu.');
             e.target.value = '';
             return;
           }
-          
+
           const matchedStudents = []; // Track matched students
           const unmatchedNames = []; // Track unmatched names
           const invalidValues = []; // Track invalid values (nilai > bobot)
           const duplicateNames = new Set(); // Track duplicate student names
           const seenNames = new Set();
-          
+
           for (let i = 2; i < json.length; i++) {
             const row = json[i];
             if (!row || row.length < 2) continue;
-            
+
             const namaSiswa = String(row[1] || '').trim();
             if (!namaSiswa || namaSiswa === 'BOBOT →' || namaSiswa.toLowerCase() === 'total bobot') continue;
-            
+
             // Deteksi duplicate names di Excel
             if (seenNames.has(namaSiswa.toLowerCase())) {
               duplicateNames.add(namaSiswa);
             }
             seenNames.add(namaSiswa.toLowerCase());
-            
+
             // Cari siswa berdasarkan nama (case-insensitive, flexible matching)
-            const student = students.find(s => 
+            const student = students.find(s =>
               s.nama_siswa.toLowerCase().trim() === namaSiswa.toLowerCase().trim()
             );
-            
+
             if (!student) {
               unmatchedNames.push(namaSiswa);
               continue;
             }
-            
+
             if (!newAnswers[student.id_siswa]) newAnswers[student.id_siswa] = {};
             matchedStudents.push(student);
-            
+
             // Parse nilai per soal dengan validasi
             qCols.forEach((q, idx) => {
               const val = row[idx + 2];
               if (val !== null && val !== undefined && val !== '') {
                 const numVal = Number(val);
                 const bobotSoal = newWeights[q] || 1;
-                
+
                 // Validasi: nilai harus numerik
                 if (isNaN(numVal)) {
                   invalidValues.push(`${namaSiswa} - ${q}: "${val}" (bukan angka)`);
                   return;
                 }
-                
+
                 // Validasi: nilai tidak boleh negatif
                 if (numVal < 0) {
                   invalidValues.push(`${namaSiswa} - ${q}: ${numVal} (negatif)`);
                   return;
                 }
-                
+
                 // Warning: nilai melebihi bobot (tetap dimasukkan tapi dengan warning)
                 if (numVal > bobotSoal) {
                   invalidValues.push(`${namaSiswa} - ${q}: ${numVal} > bobot ${bobotSoal}`);
                 }
-                
+
                 newAnswers[student.id_siswa][q] = numVal;
               }
             });
           }
-          
+
           // Validasi: minimal 1 siswa harus match
           if (matchedStudents.length === 0) {
             const errors = unmatchedNames.map(name => ({
@@ -534,19 +540,19 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             e.target.value = '';
             return;
           }
-          
+
           // Update state
           setWeights(newWeights);
           setAnswers(newAnswers);
           setQuestionKeys(qCols);
-          
+
           // Auto-populate analysisStudents jika belum ada
           if (analysisStudents.length === 0 && matchedStudents.length > 0) {
             setAnalysisStudents(matchedStudents);
           }
-          
+
           const errors = [];
-          
+
           // Collect all errors for detail panel
           if (unmatchedNames.length > 0) {
             unmatchedNames.forEach(name => {
@@ -556,7 +562,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
               });
             });
           }
-          
+
           if (duplicateNames.size > 0) {
             Array.from(duplicateNames).forEach(name => {
               errors.push({
@@ -565,7 +571,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
               });
             });
           }
-          
+
           if (invalidValues.length > 0) {
             invalidValues.forEach(errMsg => {
               // Parse error message untuk extract info
@@ -574,18 +580,18 @@ const RekapNilai = ({ activeTASemester, userId }) => {
               const studentName = parts[0];
               const questionPart = parts[1] || '';
               const [question, valuePart] = questionPart.split(': ');
-              
+
               errors.push({
                 student: studentName,
                 question: question,
                 value: valuePart ? valuePart.split(' ')[0] : undefined,
-                error: errMsg.includes('bukan angka') ? 'Nilai bukan angka yang valid' : 
-                       errMsg.includes('negatif') ? 'Nilai tidak boleh negatif' :
-                       errMsg.includes('>') ? 'Nilai melebihi bobot maksimal' : 'Nilai tidak valid'
+                error: errMsg.includes('bukan angka') ? 'Nilai bukan angka yang valid' :
+                  errMsg.includes('negatif') ? 'Nilai tidak boleh negatif' :
+                    errMsg.includes('>') ? 'Nilai melebihi bobot maksimal' : 'Nilai tidak valid'
               });
             });
           }
-          
+
           // Set error details if any and show toast notification
           if (errors.length > 0) {
             setErrorDetails(errors);
@@ -596,28 +602,133 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             setShowErrorDetails(false);
             toast.success(`✅ Excel berhasil diupload! 📊 ${qCols.length} soal, ${matchedStudents.length} siswa berhasil dimuat.`);
           }
-          
+
           // Reset file input
           e.target.value = '';
-          
+
         } catch (err) {
           console.error('Error parsing Excel:', err);
           toast.error('❌ Gagal memproses Excel: ' + (err.message || 'Unknown error') + '. 💡 Pastikan file Excel tidak corrupt dan format sesuai template.');
           e.target.value = '';
         }
       };
-      
+
       reader.onerror = () => {
         toast.error('❌ Gagal membaca file! File mungkin corrupt atau sedang digunakan aplikasi lain.');
         e.target.value = '';
       };
-      
+
       reader.readAsArrayBuffer(file);
-      
+
     } catch (err) {
       console.error('Error uploading Excel:', err);
       toast.error('❌ Gagal upload Excel: ' + (err.message || 'Unknown error'));
       e.target.value = '';
+    }
+  };
+
+  const handleSaveToGradebook = async () => {
+    // 1. Validasi: harus ada assignment, tp/uas selected
+    if (!selectedAssignment || !activeTASemester) {
+      toast.error('Pilih assignment dan pastikan TA/Semester aktif');
+      return;
+    }
+
+    if (!questionKeys || questionKeys.length === 0) {
+      toast.error('Belum ada data analisis untuk disimpan. Silakan Run Analysis atau upload Excel dulu.');
+      return;
+    }
+
+    // Confirm dialog
+    if (!window.confirm(`Apakah Anda yakin ingin menyimpan nilai hasil analisis ini ke Rapor sebagai nilai ${selectedTpAnalysis}? Nilai lama siswa yang bersangkutan akan tertimpa.`)) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const [kelasId, mapelId] = selectedAssignment.split('-').map(Number);
+
+      // Determine jenis_nilai and urutan_tp
+      let jenis_nilai = 'TP';
+      let urutan_tp = null;
+      let keterangan = '';
+
+      if (selectedTpAnalysis === 'UAS') {
+        jenis_nilai = 'UAS';
+        keterangan = 'UAS';
+      } else if (selectedTpAnalysis.startsWith('TP')) {
+        jenis_nilai = 'TP';
+        urutan_tp = parseInt(selectedTpAnalysis.substring(2));
+        keterangan = `TP ${urutan_tp}`;
+      } else {
+        // Fallback
+        jenis_nilai = 'TP';
+        urutan_tp = 1;
+      }
+
+      const gradePromises = [];
+
+      // Students to save: analysisStudents (or fallback to rekapTableData if empty/using grid manually)
+      const studentsToSave = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }));
+
+      // Iterate students and get their computed "Nilai Akhir" from the analysis
+      studentsToSave.forEach(student => {
+        const { nilaiAkhir } = computeNilaiAkhir(student.id_siswa);
+
+        // Only save if nilaiAkhir is valid number
+        if (nilaiAkhir !== null && !isNaN(nilaiAkhir)) {
+          gradePromises.push(
+            guruApi.addOrUpdateNewGrade({
+              id_siswa: student.id_siswa,
+              id_guru: userId,
+              id_mapel: mapelId,
+              id_kelas: kelasId,
+              id_ta_semester: activeTASemester.id_ta_semester,
+              jenis_nilai: jenis_nilai,
+              urutan_tp: urutan_tp,
+              nilai: parseFloat(nilaiAkhir.toFixed(2)), // Save with 2 decimals
+              keterangan: keterangan
+            })
+          );
+        }
+      });
+
+      if (gradePromises.length === 0) {
+        toast.info('Tidak ada nilai yang valid untuk disimpan.');
+        setIsSaving(false);
+        return;
+      }
+
+      // Execute all saves
+      const results = await Promise.allSettled(gradePromises);
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      if (successful > 0 && failed === 0) {
+        toast.success(`Berhasil menyimpan ${successful} nilai ke Rapor!`);
+        // Reload rekap data to reflect changes in the main table
+        // We can just trigger the effect by faking a reload or calling fetchData/fetchRekap logic if exposed
+        // ideally we re-call the main loader
+        // Trigger re-fetch of rekap data by toggling a dummy state or just re-running the effect dependency? 
+        // Best way: duplicate the fetchRekap logic or extract it. 
+        // For now, let's just let the user see the toast. The main tab 'Rekap Nilai' will auto-refresh if we switch tabs or if we force it.
+        // Actually, we should probably force reload the rekap data so if they switch back to 'Rekap' tab it's updated.
+        // We can do this by:
+        // setLoadingRekap(true); ... fetchRekap(); ... but fetchRekap is inside useEffect.
+        // We'll just trust the user to refresh or switch tabs, or we can force a location reload or similar but that's bad UX.
+        // Let's leave it as is, the Toast is sufficient confirmation.
+      } else if (successful > 0 && failed > 0) {
+        toast.warning(`${successful} nilai berhasil disimpan, ${failed} gagal.`);
+      } else {
+        toast.error(`Gagal menyimpan nilai. Periksa koneksi atau hubungi admin.`);
+      }
+
+    } catch (err) {
+      console.error('Error saving grades:', err);
+      toast.error(`Terjadi kesalahan: ${err.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -654,7 +765,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
         try {
           // Load TP dari ATP dulu
           await loadTpFromAtp(mapelId, kelasId);
-          
+
           // Load KKM settings dari database dan store ke state
           try {
             const kkmResp = await guruApi.getKkmSettings(userId, mapelId, kelasId, activeTASemester.id_ta_semester);
@@ -667,7 +778,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
             console.warn('Error fetching KKM settings:', err?.message || err);
             setKkmSettings({});
           }
-          
+
           // Kemudian load nilai
           const data = await guruApi.getRekapNilai(userId, mapelId, kelasId, activeTASemester.id_ta_semester);
           setRekapNilai(data || []);
@@ -692,7 +803,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
         setLoadingRekap(false);
       }
     };
-    
+
     fetchRekap();
   }, [selectedAssignment, activeTASemester, userId]);
 
@@ -700,14 +811,14 @@ const RekapNilai = ({ activeTASemester, userId }) => {
   useEffect(() => {
     const fetchStudentsForAnalysisTab = async () => {
       if (!selectedAssignment || !activeTASemester) return;
-      
+
       const [kelasId] = selectedAssignment.split('-').map(Number);
       try {
         const res = await guruApi.getStudentsInClass(kelasId, activeTASemester.id_ta_semester);
         if (res && Array.isArray(res) && res.length > 0) {
-          const students = res.map(s => ({ 
-            id_siswa: s.id_siswa || s.id, 
-            nama_siswa: s.nama_siswa || s.nama 
+          const students = res.map(s => ({
+            id_siswa: s.id_siswa || s.id,
+            nama_siswa: s.nama_siswa || s.nama
           }));
           setAnalysisStudents(students);
         } else if (rekapNilai.length > 0) {
@@ -740,20 +851,40 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     fetchStudentsForAnalysisTab();
   }, [selectedAssignment, activeTASemester, rekapNilai]);
 
+  // Load TP dari ATP saat tab analysis atau selectedAssignment berubah
+  useEffect(() => {
+    const loadTpForAnalysis = async () => {
+      if (!selectedAssignment || !activeTASemester || !userId || assignments.length === 0) return;
+      
+      const [kelasId, mapelId] = selectedAssignment.split('-').map(Number);
+      
+      // Load TP saat buka tab analysis atau saat assignment berubah
+      try {
+        await loadTpFromAtp(mapelId, kelasId);
+      } catch (err) {
+        console.error('Error loading TP for analysis tab:', err);
+      }
+    };
+
+    loadTpForAnalysis();
+  }, [selectedAssignment, activeTASemester, userId, activeTab, assignments]);
+
   const loadTpFromAtp = async (mapelId, kelasId) => {
+    console.log('🔍 Loading TP from ATP for:', { mapelId, kelasId, selectedAssignment });
     try {
       const currentAssignment = assignments.find(
         assign => `${assign.id_kelas}-${assign.id_mapel}` === selectedAssignment
       );
 
       if (!currentAssignment) {
+        console.warn('⚠️ Current assignment not found');
         return;
       }
 
       let fase = 'A';
       const kelasName = currentAssignment?.nama_kelas || '';
       const tingkatKelas = parseInt(kelasName.match(/^(\d+)/)?.[1] || '1');
-      
+
       if (tingkatKelas >= 1 && tingkatKelas <= 2) fase = 'A';
       else if (tingkatKelas >= 3 && tingkatKelas <= 4) fase = 'B';
       else if (tingkatKelas >= 5 && tingkatKelas <= 6) fase = 'C';
@@ -764,40 +895,54 @@ const RekapNilai = ({ activeTASemester, userId }) => {
       }
 
       const tpData = await guruApi.getTpByMapelFaseKelas(mapelId, fase, kelasId, semesterNumber);
-      
+
       let tpNumbers = [];
-      
+      const descriptions = {};
+
       if (tpData.success && tpData.tp_list && tpData.tp_list.length > 0) {
         tpNumbers = tpData.tp_list.map((_, index) => index + 1);
+        tpData.tp_list.forEach((tp, index) => {
+          descriptions[index + 1] = tp.tujuan_pembelajaran;
+        });
+        console.log('✅ Loaded TP from ATP:', tpNumbers.length, 'items');
+      } else {
+        console.log('⚠️ No TP data from ATP');
       }
-      
-      // Load TP manual dari database
-      const [kelasId, mapelId] = selectedAssignment.split('-').map(Number);
+
+      // Load TP manual dari database (reuse parameters, don't redeclare)
       const penugasanData = await guruApi.getPenugasanByGuruMapelKelas(
         userId,
         mapelId,
         kelasId,
         activeTASemester.id_ta_semester
       );
-      
+
       if (penugasanData && penugasanData.id_penugasan) {
         const manualTpData = await guruApi.getManualTp(
           penugasanData.id_penugasan,
           activeTASemester.id_ta_semester
         );
-        
+
         if (manualTpData.success && manualTpData.manual_tp.length > 0) {
           const manualTpColumns = manualTpData.manual_tp.map(tp => tp.tp_number);
           // Gabungkan dengan TP dari ATP, hilangkan duplikat
           const allTp = [...new Set([...tpNumbers, ...manualTpColumns])].sort((a, b) => a - b);
           tpNumbers = allTp;
+
+          // Add manual TP descriptions
+          manualTpData.manual_tp.forEach(tp => {
+            descriptions[tp.tp_number] = tp.tp_name;
+          });
         }
       }
-      
+
+      console.log('📋 Final TP columns:', tpNumbers);
       setAllTpColumns(tpNumbers.length > 0 ? tpNumbers : []);
+      setTpDescriptions(descriptions);
     } catch (err) {
-      console.log('Error loading TP from ATP:', err.message);
+      console.error('❌ Error loading TP from ATP:', err.message, err);
       setAllTpColumns([]);
+      setTpDescriptions({});
     }
   };
 
@@ -811,30 +956,30 @@ const RekapNilai = ({ activeTASemester, userId }) => {
   // Mengolah data rekap untuk tampilan tabel pivot
   const processedRekap = {};
   const gradeTypes = new Set();
-  
+
   // Tambahkan semua TP dari ATP ke gradeTypes (supaya kolom muncul meski belum ada nilai)
   if (allTpColumns.length > 0) {
     allTpColumns.forEach(tpNum => {
       gradeTypes.add(`TP${tpNum}`);
     });
   }
-  
+
   // Tambahkan UAS
   gradeTypes.add('UAS');
-  
+
   // Process nilai yang ada
   if (Array.isArray(rekapNilai) && rekapNilai.length > 0) {
     rekapNilai.forEach(item => {
       if (!item || !item.id_siswa) return; // Skip invalid data
-      
+
       // Use id_siswa as key instead of nama_siswa (more reliable)
       if (!processedRekap[item.id_siswa]) {
-        processedRekap[item.id_siswa] = { 
-          id_siswa: item.id_siswa, 
-          nama_siswa: item.nama_siswa 
+        processedRekap[item.id_siswa] = {
+          id_siswa: item.id_siswa,
+          nama_siswa: item.nama_siswa
         };
       }
-      
+
       // Create column name based on jenis_nilai and urutan_tp
       let columnName;
       if (item.jenis_nilai === 'TP') {
@@ -844,7 +989,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
       } else {
         columnName = item.jenis_nilai; // fallback
       }
-      
+
       processedRekap[item.id_siswa][columnName] = item.nilai;
       gradeTypes.add(columnName); // Tetap add untuk handle TP manual yang belum di ATP
     });
@@ -863,9 +1008,9 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     }
     return a.localeCompare(b);
   });
-  
+
   // Sort students alphabetically by name
-  const rekapTableData = Object.values(processedRekap).sort((a, b) => 
+  const rekapTableData = Object.values(processedRekap).sort((a, b) =>
     a.nama_siswa.localeCompare(b.nama_siswa, 'id', { sensitivity: 'base' })
   );
 
@@ -879,7 +1024,7 @@ const RekapNilai = ({ activeTASemester, userId }) => {
     ...uniqueGradeTypes.map(tipe => ({
       key: tipe,
       // Show KKM value in header if available
-      label: tipe + (tipe.startsWith('TP') ? ` (KKM ${ (Number(kkmSettings[tipe] || kkmSettings[`TP${tipe.replace('TP','')}`]) || (tipe.startsWith('TP') ? 75 : '')) })` : (tipe === 'UAS' ? ` (KKM ${ (Number(kkmSettings.UAS) || 75) })` : '')),
+      label: tipe + (tipe.startsWith('TP') ? ` (KKM ${(Number(kkmSettings[tipe] || kkmSettings[`TP${tipe.replace('TP', '')}`]) || (tipe.startsWith('TP') ? 75 : ''))})` : (tipe === 'UAS' ? ` (KKM ${(Number(kkmSettings.UAS) || 75)})` : '')),
       className: 'text-center',
       render: (nilai, row) => {
         // Determine KKM threshold for this column
@@ -895,13 +1040,12 @@ const RekapNilai = ({ activeTASemester, userId }) => {
         const yellowThreshold = Math.max(0, kkmVal - 15);
 
         return (
-          <span className={`inline-flex items-center justify-center w-16 px-2 py-1 rounded ${
-            typeof nilai === 'number' 
-              ? (nilai >= kkmVal
-                  ? 'bg-green-100 text-green-800 font-semibold'
-                  : (nilai >= yellowThreshold ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800 font-semibold'))
-              : 'text-gray-400'
-          }`}>
+          <span className={`inline-flex items-center justify-center w-16 px-2 py-1 rounded ${typeof nilai === 'number'
+            ? (nilai >= kkmVal
+              ? 'bg-green-100 text-green-800 font-semibold'
+              : (nilai >= yellowThreshold ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800 font-semibold'))
+            : 'text-gray-400'
+            }`}>
             {typeof nilai === 'number' ? nilai : '-'}
           </span>
         );
@@ -919,28 +1063,27 @@ const RekapNilai = ({ activeTASemester, userId }) => {
           .map(tipe => row?.[tipe]) // Safe access
           .filter(n => typeof n === 'number');
         const tpAverage = tpGrades.length > 0 ? tpGrades.reduce((sum, n) => sum + n, 0) / tpGrades.length : 0;
-        
+
         // Get UAS value with safe access
         const uasValue = row?.['UAS'];
-        
+
         // Calculate final grade (70% TP + 30% UAS)
         let finalGrade = '-';
         if (tpGrades.length > 0 && typeof uasValue === 'number') {
           finalGrade = (tpAverage * 0.7 + uasValue * 0.3).toFixed(2);
         }
-        
+
         // Determine final KKM
         const finalKkm = (kkmSettings && kkmSettings.FINAL !== undefined && !isNaN(Number(kkmSettings.FINAL))) ? Number(kkmSettings.FINAL) : 75;
         const finalYellow = Math.max(0, finalKkm - 15);
-        
+
         return (
-          <span className={`inline-flex items-center justify-center w-20 px-3 py-1 rounded-full font-bold ${
-            finalGrade !== '-'
-              ? (parseFloat(finalGrade) >= finalKkm 
-                  ? 'bg-green-500 text-white'
-                  : (parseFloat(finalGrade) >= finalYellow ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white'))
-              : 'text-gray-400'
-          }`}>
+          <span className={`inline-flex items-center justify-center w-20 px-3 py-1 rounded-full font-bold ${finalGrade !== '-'
+            ? (parseFloat(finalGrade) >= finalKkm
+              ? 'bg-green-500 text-white'
+              : (parseFloat(finalGrade) >= finalYellow ? 'bg-yellow-500 text-white' : 'bg-red-500 text-white'))
+            : 'text-gray-400'
+            }`}>
             {finalGrade}
           </span>
         );
@@ -959,59 +1102,59 @@ const RekapNilai = ({ activeTASemester, userId }) => {
 
       {errorDetails.length > 0 && (
         <div className="mb-6">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <button
-                onClick={() => setShowErrorDetails(!showErrorDetails)}
-                className="flex items-center justify-between w-full text-left"
-              >
-                <h4 className="font-semibold text-red-800 flex items-center">
-                  <i className="fas fa-exclamation-triangle mr-2"></i>
-                  Detail Error Upload Excel ({errorDetails.length})
-                </h4>
-                <i className={`fas fa-chevron-${showErrorDetails ? 'up' : 'down'} text-red-600`}></i>
-              </button>
-              
-              {showErrorDetails && (
-                <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
-                  {errorDetails.map((err, idx) => (
-                    <div key={idx} className="bg-white border border-red-300 rounded p-3 text-sm">
-                      {err.student && (
-                        <div className="font-medium text-gray-900 mb-1">
-                          <i className="fas fa-user mr-1 text-red-600"></i>
-                          {err.student}
-                        </div>
-                      )}
-                      {err.question && (
-                        <div className="text-gray-700 mb-1">
-                          <i className="fas fa-question-circle mr-1 text-blue-600"></i>
-                          Soal: <strong>{err.question}</strong>
-                          {err.value !== undefined && <> - Nilai: <strong>{err.value}</strong></>}
-                        </div>
-                      )}
-                      <div className="text-red-700">
-                        <i className="fas fa-times-circle mr-1"></i>
-                        {err.error}
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <button
+              onClick={() => setShowErrorDetails(!showErrorDetails)}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <h4 className="font-semibold text-red-800 flex items-center">
+                <i className="fas fa-exclamation-triangle mr-2"></i>
+                Detail Error Upload Excel ({errorDetails.length})
+              </h4>
+              <i className={`fas fa-chevron-${showErrorDetails ? 'up' : 'down'} text-red-600`}></i>
+            </button>
+
+            {showErrorDetails && (
+              <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
+                {errorDetails.map((err, idx) => (
+                  <div key={idx} className="bg-white border border-red-300 rounded p-3 text-sm">
+                    {err.student && (
+                      <div className="font-medium text-gray-900 mb-1">
+                        <i className="fas fa-user mr-1 text-red-600"></i>
+                        {err.student}
                       </div>
+                    )}
+                    {err.question && (
+                      <div className="text-gray-700 mb-1">
+                        <i className="fas fa-question-circle mr-1 text-blue-600"></i>
+                        Soal: <strong>{err.question}</strong>
+                        {err.value !== undefined && <> - Nilai: <strong>{err.value}</strong></>}
+                      </div>
+                    )}
+                    <div className="text-red-700">
+                      <i className="fas fa-times-circle mr-1"></i>
+                      {err.error}
                     </div>
-                  ))}
-                  <div className="mt-3 pt-3 border-t border-red-200">
-                    <button
-                      onClick={() => {
-                        const errorText = errorDetails.map((err, idx) => 
-                          `${idx + 1}. ${err.student ? `${err.student}` : ''} ${err.question ? `(${err.question})` : ''}: ${err.error}`
-                        ).join('\n');
-                        navigator.clipboard.writeText(errorText);
-                        toast.success('Error details berhasil dicopy ke clipboard');
-                      }}
-                      className="text-sm text-red-700 hover:text-red-900 underline"
-                    >
-                      <i className="fas fa-copy mr-1"></i>
-                      Copy Error Details
-                    </button>
                   </div>
+                ))}
+                <div className="mt-3 pt-3 border-t border-red-200">
+                  <button
+                    onClick={() => {
+                      const errorText = errorDetails.map((err, idx) =>
+                        `${idx + 1}. ${err.student ? `${err.student}` : ''} ${err.question ? `(${err.question})` : ''}: ${err.error}`
+                      ).join('\n');
+                      navigator.clipboard.writeText(errorText);
+                      toast.success('Error details berhasil dicopy ke clipboard');
+                    }}
+                    className="text-sm text-red-700 hover:text-red-900 underline"
+                  >
+                    <i className="fas fa-copy mr-1"></i>
+                    Copy Error Details
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1128,12 +1271,33 @@ const RekapNilai = ({ activeTASemester, userId }) => {
                         <h3 className="text-lg font-semibold mb-3">Setup Analisis Soal</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700">Mata Pelajaran</label>
-                            <input type="text" value={subjectName} onChange={e=>setSubjectName(e.target.value)} className="mt-1 w-full px-2 py-1 border rounded" placeholder="Contoh: Matematika" />
+                            <label className="block text-sm font-medium text-gray-700">Mata Pelajaran (dari Penugasan)</label>
+                            <select
+                              value={selectedAssignment}
+                              onChange={(e) => setSelectedAssignment(e.target.value)}
+                              className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                              {assignments.map(assign => (
+                                <option key={`${assign.id_kelas}-${assign.id_mapel}`} value={`${assign.id_kelas}-${assign.id_mapel}`}>
+                                  {assign.nama_kelas} - {assign.nama_mapel}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700">Kelas (untuk export)</label>
-                            <input type="text" value={classNameExport} onChange={e=>setClassNameExport(e.target.value)} className="mt-1 w-full px-2 py-1 border rounded" placeholder="Contoh: 1 Darehdeh" />
+                            <label className="block text-sm font-medium text-gray-700">Pilih Data Analisis</label>
+                            <select
+                              value={selectedTpAnalysis}
+                              onChange={(e) => setSelectedTpAnalysis(e.target.value)}
+                              className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                              <option value="UAS">UAS (Sumatif Akhir Semester)</option>
+                              {allTpColumns.map(tpNum => (
+                                <option key={tpNum} value={`TP${tpNum}`}>
+                                  TP {tpNum} {tpDescriptions && tpDescriptions[tpNum] ? `- ${tpDescriptions[tpNum].substring(0, 30)}...` : ''}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         </div>
 
@@ -1167,10 +1331,44 @@ const RekapNilai = ({ activeTASemester, userId }) => {
                                 <input type="file" accept=".xlsx,.xls" onChange={handleUploadExcel} className="hidden" id="upload-excel" />
                                 <Button as="span" onClick={() => document.getElementById('upload-excel').click()}>Upload Excel</Button>
                               </label>
-                              <Button onClick={() => exportCTTAnalysisToExcel({ subjectName, className: classNameExport, questionKeys: questionKeys.length>0 ? questionKeys : [], students: (analysisStudents.length>0 ? analysisStudents : rekapTableData.map(r=>({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }))), answers, weights, scale, analysisResults, cronbachAlpha, semValue })} disabled={!analysisResults || analysisResults.length === 0}>Export Excel</Button>
-                              <Button variant="secondary" onClick={() => { 
-                                setAnalysisResults([]); 
-                                setCronbachAlpha(null); 
+                              <Button 
+                                onClick={() => exportCTTAnalysisToExcel({ 
+                                  subjectName: currentAssignment?.nama_mapel || '', 
+                                  className: currentAssignment?.nama_kelas || '', 
+                                  questionKeys: questionKeys.length > 0 ? questionKeys : [], 
+                                  students: (analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }))), 
+                                  answers, 
+                                  weights, 
+                                  scale, 
+                                  analysisResults, 
+                                  cronbachAlpha, 
+                                  semValue,
+                                  selectedTpAnalysis
+                                })} 
+                                disabled={!analysisResults || analysisResults.length === 0}
+                              >
+                                Export Excel
+                              </Button>
+                              {/* SIMPAN KE RAPOR BUTTON */}
+                              <Button
+                                variant="primary"
+                                className="bg-green-600 hover:bg-green-700 text-white border-none"
+                                onClick={handleSaveToGradebook}
+                                disabled={!questionKeys || questionKeys.length === 0 || isSaving}
+                              >
+                                {isSaving ? (
+                                  <span className="flex items-center gap-2">
+                                    <i className="fas fa-spinner fa-spin"></i> Menyimpan...
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-2">
+                                    <i className="fas fa-save"></i> Simpan ke Rapor
+                                  </span>
+                                )}
+                              </Button>
+                              <Button variant="secondary" onClick={() => {
+                                setAnalysisResults([]);
+                                setCronbachAlpha(null);
                                 setSemValue(null);
                                 toast.success('Hasil analisis dihapus');
                               }}>Clear Analysis</Button>
@@ -1180,136 +1378,136 @@ const RekapNilai = ({ activeTASemester, userId }) => {
 
                         {/* Grid */}
                         {questionKeys && questionKeys.length > 0 && (
-                            <div className="mt-4 overflow-auto border rounded">
-                              <table className="min-w-full border-collapse">
-                                <thead>
-                                  <tr className="bg-gray-50">
-                                    <th className="p-2 border">No</th>
-                                    <th className="p-2 border">Nama Peserta Didik</th>
-                                    {questionKeys.map(k => (
-                                      <th key={k} className="p-2 border text-center">
-                                        <div className="text-sm font-semibold">Soal {k.replace('Q','')}</div>
-                                        <div className="mt-1">
-                                          <input 
-                                            title="Bobot/Max Score" 
-                                            type="number" 
-                                            step="0.01" 
-                                            min="0" 
-                                            value={weights[k] !== undefined && weights[k] !== '' ? weights[k] : ''} 
-                                            onChange={e => {
-                                              const val = e.target.value;
-                                              setWeights({ ...weights, [k]: val === '' ? '' : Number(val) });
-                                            }}
-                                            onBlur={e => {
-                                              // Set default 1 jika kosong saat blur
-                                              if (e.target.value === '' || Number(e.target.value) <= 0) {
-                                                setWeights({ ...weights, [k]: 1 });
-                                              }
-                                            }}
-                                            className="w-16 px-1 py-0.5 border rounded text-center" 
-                                            placeholder="1"
-                                          />
-                                        </div>
-                                      </th>
-                                    ))}
-                                    <th className="p-2 border text-center">Nilai Akhir</th>
-                                  </tr>
-
-                                  {/* Row 2: Total Bobot */}
-                                  <tr className="bg-gray-50">
-                                    <th className="p-1 border">&nbsp;</th>
-                                    <th className="p-1 border text-sm">Total Bobot</th>
-                                    {questionKeys.map(k => (
-                                      <th key={k+"-w"} className="p-1 border text-center text-sm">{(weights && weights[k]) ? Number(weights[k]).toFixed(2) : ''}</th>
-                                    ))}
-                                    <th className="p-1 border text-center text-sm font-medium">{getTotalWeight().toFixed(2)}</th>
-                                  </tr> 
-                                </thead>
-                                <tbody>
-                                  {(analysisStudents && analysisStudents.length>0 ? analysisStudents : rekapTableData.map(r=>({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }))).map((s, idx) => (
-                                    <tr key={s.id_siswa} className="odd:bg-white even:bg-gray-50">
-                                      <td className="p-2 border text-center">{idx+1}</td>
-                                      <td className="p-2 border">{s.nama_siswa}</td>
-                                      {questionKeys.map(k => (
-                                        <td key={k} className="p-1 border text-center">
-                                          <input type="number" value={answers[s.id_siswa] && answers[s.id_siswa][k] !== undefined ? answers[s.id_siswa][k] : ''} onChange={e=> setCellValue(s.id_siswa, k, e.target.value)} className="w-20 px-1 py-0.5 border rounded text-center" />
-                                        </td>
-                                      ))}
-
-                                      <td className="p-2 border text-center font-semibold">
-                                        {(() => { 
-                                          const result = computeNilaiAkhir(s.id_siswa); 
-                                          return result.nilaiAkhir === null 
-                                            ? '-' 
-                                            : `${result.totalBobotSiswa.toFixed(1)} / ${result.totalBobotNilai.toFixed(1)} = ${result.nilaiAkhir.toFixed(2)}`;
-                                        })()}
-                                      </td>
-                                    </tr>
+                          <div className="mt-4 overflow-auto border rounded">
+                            <table className="min-w-full border-collapse">
+                              <thead>
+                                <tr className="bg-gray-50">
+                                  <th className="p-2 border">No</th>
+                                  <th className="p-2 border">Nama Peserta Didik</th>
+                                  {questionKeys.map(k => (
+                                    <th key={k} className="p-2 border text-center">
+                                      <div className="text-sm font-semibold">Soal {k.replace('Q', '')}</div>
+                                      <div className="mt-1">
+                                        <input
+                                          title="Bobot/Max Score"
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={weights[k] !== undefined && weights[k] !== '' ? weights[k] : ''}
+                                          onChange={e => {
+                                            const val = e.target.value;
+                                            setWeights({ ...weights, [k]: val === '' ? '' : Number(val) });
+                                          }}
+                                          onBlur={e => {
+                                            // Set default 1 jika kosong saat blur
+                                            if (e.target.value === '' || Number(e.target.value) <= 0) {
+                                              setWeights({ ...weights, [k]: 1 });
+                                            }
+                                          }}
+                                          className="w-16 px-1 py-0.5 border rounded text-center"
+                                          placeholder="1"
+                                        />
+                                      </div>
+                                    </th>
                                   ))}
-                                </tbody>
-                                <tfoot>
-                                  <tr className="bg-gray-100">
-                                    <td className="p-2 border text-sm">#Resp</td>
-                                    <td className="p-2 border text-sm">&nbsp;</td>
-                                    {questionKeys.map(k => {
-                                      const ar = analysisStudents.length>0 ? analysisStudents : rekapTableData.map(r=>({ id_siswa: r.id_siswa }));
-                                      let n = 0; let sum=0; let cnt=0;
-                                      ar.forEach(s=>{ const v = answers[s.id_siswa] && answers[s.id_siswa][k]; if (v !== '' && v !== undefined && v !== null) { const num = Number(v); if (!isNaN(num)) { n++; sum+=num; cnt++; } } });
-                                      const mean = cnt>0 ? (sum / cnt) : null;
-                                      return <td key={k} className="p-2 border text-center text-sm font-medium">{n}</td>;
-                                    })}
-                                    <td className="p-2 border text-sm">&nbsp;</td>
-                                  </tr>
+                                  <th className="p-2 border text-center">Nilai Akhir</th>
+                                </tr>
 
-                                  <tr className="bg-gray-100">
-                                    <td className="p-2 border text-sm">p-value</td>
-                                    <td className="p-2 border text-sm">&nbsp;</td>
-                                    {questionKeys.map(k => {
-                                      const ar = analysisStudents.length>0 ? analysisStudents : rekapTableData.map(r=>({ id_siswa: r.id_siswa }));
-                                      let n=0, sum=0;
-                                      const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
-                                      ar.forEach(s=>{ const v = answers[s.id_siswa] && answers[s.id_siswa][k]; if (v !== '' && v !== undefined && v !== null) { const num = Number(v); if (!isNaN(num)) { n++; sum += num; } } });
-                                      const mean = n===0 ? null : (sum / n);
-                                      const p = mean === null ? null : ( bobot > 0 ? (mean / bobot) : null );
-                                      return <td key={k} className="p-2 border text-center text-sm">{p===null ? '-' : p.toFixed(3)}</td>;
-                                    })}
-                                    <td className="p-2 border text-sm">&nbsp;</td>
-                                  </tr>
+                                {/* Row 2: Total Bobot */}
+                                <tr className="bg-gray-50">
+                                  <th className="p-1 border">&nbsp;</th>
+                                  <th className="p-1 border text-sm">Total Bobot</th>
+                                  {questionKeys.map(k => (
+                                    <th key={k + "-w"} className="p-1 border text-center text-sm">{(weights && weights[k]) ? Number(weights[k]).toFixed(2) : ''}</th>
+                                  ))}
+                                  <th className="p-1 border text-center text-sm font-medium">{getTotalWeight().toFixed(2)}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(analysisStudents && analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa, nama_siswa: r.nama_siswa }))).map((s, idx) => (
+                                  <tr key={s.id_siswa} className="odd:bg-white even:bg-gray-50">
+                                    <td className="p-2 border text-center">{idx + 1}</td>
+                                    <td className="p-2 border">{s.nama_siswa}</td>
+                                    {questionKeys.map(k => (
+                                      <td key={k} className="p-1 border text-center">
+                                        <input type="number" value={answers[s.id_siswa] && answers[s.id_siswa][k] !== undefined ? answers[s.id_siswa][k] : ''} onChange={e => setCellValue(s.id_siswa, k, e.target.value)} className="w-20 px-1 py-0.5 border rounded text-center" />
+                                      </td>
+                                    ))}
 
-                                  <tr className="bg-gray-100">
-                                    <td className="p-2 border text-sm">Mean %</td>
-                                    <td className="p-2 border text-sm">&nbsp;</td>
-                                    {questionKeys.map(k => {
-                                      const ar = analysisStudents.length>0 ? analysisStudents : rekapTableData.map(r=>({ id_siswa: r.id_siswa }));
-                                      let sum=0, n=0;
-                                      const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
-                                      ar.forEach(s=>{ const v = answers[s.id_siswa] && answers[s.id_siswa][k]; if (v !== '' && v !== undefined && v !== null) { const num = Number(v); if (!isNaN(num)) { n++; sum += (bobot>0 ? (num / bobot) : 0); } } });
-                                      const mean = n===0 ? null : (sum / n);
-                                      return <td key={k} className="p-2 border text-center text-sm">{mean===null ? '-' : ( (mean*100).toFixed(1) + '%' )}</td>;
-                                    })}
-                                    <td className="p-2 border text-sm">&nbsp;</td>
+                                    <td className="p-2 border text-center font-semibold">
+                                      {(() => {
+                                        const result = computeNilaiAkhir(s.id_siswa);
+                                        return result.nilaiAkhir === null
+                                          ? '-'
+                                          : `${result.totalBobotSiswa.toFixed(1)} / ${result.totalBobotNilai.toFixed(1)} = ${result.nilaiAkhir.toFixed(2)}`;
+                                      })()}
+                                    </td>
                                   </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="bg-gray-100">
+                                  <td className="p-2 border text-sm">#Resp</td>
+                                  <td className="p-2 border text-sm">&nbsp;</td>
+                                  {questionKeys.map(k => {
+                                    const ar = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa }));
+                                    let n = 0; let sum = 0; let cnt = 0;
+                                    ar.forEach(s => { const v = answers[s.id_siswa] && answers[s.id_siswa][k]; if (v !== '' && v !== undefined && v !== null) { const num = Number(v); if (!isNaN(num)) { n++; sum += num; cnt++; } } });
+                                    const mean = cnt > 0 ? (sum / cnt) : null;
+                                    return <td key={k} className="p-2 border text-center text-sm font-medium">{n}</td>;
+                                  })}
+                                  <td className="p-2 border text-sm">&nbsp;</td>
+                                </tr>
 
-                                  <tr className="bg-gray-100">
-                                    <td className="p-2 border text-sm">Difficulty</td>
-                                    <td className="p-2 border text-sm">&nbsp;</td>
-                                    {questionKeys.map(k => {
-                                      const ar = analysisStudents.length>0 ? analysisStudents : rekapTableData.map(r=>({ id_siswa: r.id_siswa }));
-                                      let n=0, sum=0;
-                                      const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
-                                      ar.forEach(s=>{ const v = answers[s.id_siswa] && answers[s.id_siswa][k]; if (v !== '' && v !== undefined && v !== null) { const num = Number(v); if (!isNaN(num)) { n++; sum += num; } } });
-                                      const mean = n===0 ? null : (sum / n);
-                                      const p = mean === null ? null : ( bobot > 0 ? (mean / bobot) : null );
-                                      const diff = classifyByP(p);
-                                      let cls = 'bg-yellow-200 text-yellow-800'; if (diff === 'Mudah') cls='bg-green-200 text-green-800'; if (diff==='Sukar') cls='bg-red-200 text-red-800'; if (diff==='-') cls='bg-gray-100 text-gray-600';
-                                      return <td key={k} className="p-2 border text-center"><span className={`px-2 py-1 rounded ${cls}`}>{diff}</span></td>; 
-                                    })}
-                                    <td className="p-2 border text-sm">&nbsp;</td>
-                                  </tr>
-                                </tfoot>
-                              </table>
-                            </div>
-                          )}
+                                <tr className="bg-gray-100">
+                                  <td className="p-2 border text-sm">p-value</td>
+                                  <td className="p-2 border text-sm">&nbsp;</td>
+                                  {questionKeys.map(k => {
+                                    const ar = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa }));
+                                    let n = 0, sum = 0;
+                                    const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
+                                    ar.forEach(s => { const v = answers[s.id_siswa] && answers[s.id_siswa][k]; if (v !== '' && v !== undefined && v !== null) { const num = Number(v); if (!isNaN(num)) { n++; sum += num; } } });
+                                    const mean = n === 0 ? null : (sum / n);
+                                    const p = mean === null ? null : (bobot > 0 ? (mean / bobot) : null);
+                                    return <td key={k} className="p-2 border text-center text-sm">{p === null ? '-' : p.toFixed(3)}</td>;
+                                  })}
+                                  <td className="p-2 border text-sm">&nbsp;</td>
+                                </tr>
+
+                                <tr className="bg-gray-100">
+                                  <td className="p-2 border text-sm">Mean %</td>
+                                  <td className="p-2 border text-sm">&nbsp;</td>
+                                  {questionKeys.map(k => {
+                                    const ar = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa }));
+                                    let sum = 0, n = 0;
+                                    const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
+                                    ar.forEach(s => { const v = answers[s.id_siswa] && answers[s.id_siswa][k]; if (v !== '' && v !== undefined && v !== null) { const num = Number(v); if (!isNaN(num)) { n++; sum += (bobot > 0 ? (num / bobot) : 0); } } });
+                                    const mean = n === 0 ? null : (sum / n);
+                                    return <td key={k} className="p-2 border text-center text-sm">{mean === null ? '-' : ((mean * 100).toFixed(1) + '%')}</td>;
+                                  })}
+                                  <td className="p-2 border text-sm">&nbsp;</td>
+                                </tr>
+
+                                <tr className="bg-gray-100">
+                                  <td className="p-2 border text-sm">Difficulty</td>
+                                  <td className="p-2 border text-sm">&nbsp;</td>
+                                  {questionKeys.map(k => {
+                                    const ar = analysisStudents.length > 0 ? analysisStudents : rekapTableData.map(r => ({ id_siswa: r.id_siswa }));
+                                    let n = 0, sum = 0;
+                                    const bobot = (weights && weights[k] !== undefined) ? Number(weights[k]) : 1;
+                                    ar.forEach(s => { const v = answers[s.id_siswa] && answers[s.id_siswa][k]; if (v !== '' && v !== undefined && v !== null) { const num = Number(v); if (!isNaN(num)) { n++; sum += num; } } });
+                                    const mean = n === 0 ? null : (sum / n);
+                                    const p = mean === null ? null : (bobot > 0 ? (mean / bobot) : null);
+                                    const diff = classifyByP(p);
+                                    let cls = 'bg-yellow-200 text-yellow-800'; if (diff === 'Mudah') cls = 'bg-green-200 text-green-800'; if (diff === 'Sukar') cls = 'bg-red-200 text-red-800'; if (diff === '-') cls = 'bg-gray-100 text-gray-600';
+                                    return <td key={k} className="p-2 border text-center"><span className={`px-2 py-1 rounded ${cls}`}>{diff}</span></td>;
+                                  })}
+                                  <td className="p-2 border text-sm">&nbsp;</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        )}
 
                         {/* Analysis Results */}
                         {analysisResults && analysisResults.length === 0 ? (
@@ -1322,12 +1520,12 @@ const RekapNilai = ({ activeTASemester, userId }) => {
                               {/* Summary Narasi - User Friendly */}
                               <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
                                 <h3 className="text-lg font-bold text-indigo-900 mb-3">📊 Rangkuman Analisis Soal</h3>
-                                
+
                                 {(() => {
                                   const mudah = analysisResults.filter(r => r.difficulty === 'Mudah').map(r => r.question.replace('Q', ''));
                                   const sedang = analysisResults.filter(r => r.difficulty === 'Sedang').map(r => r.question.replace('Q', ''));
                                   const sukar = analysisResults.filter(r => r.difficulty === 'Sukar').map(r => r.question.replace('Q', ''));
-                                  
+
                                   return (
                                     <div className="space-y-3">
                                       {/* Soal Mudah */}

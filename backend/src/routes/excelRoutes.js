@@ -17,6 +17,9 @@ router.get('/atp/:id_mapel/:fase', excelController.getAtpByFase);
 // Route untuk update ATP berdasarkan mapel dan fase
 router.put('/atp/:id_mapel/:fase', excelController.updateAtpByFase);
 
+// Route untuk menambahkan ATP row manual
+router.post('/atp/:id_mapel/:fase/add-row', excelController.addAtpRow);
+
 // Route untuk mengambil TP berdasarkan mapel, fase, dan kelas
 router.get('/tp/:id_mapel/:fase/:id_kelas', excelController.getTpByMapelFaseKelas);
 
@@ -27,5 +30,9 @@ router.post('/students/import', upload.single('file'), excelController.importStu
 // Routes untuk import enrollment siswa ke kelas
 router.get('/enrollment/template', excelController.exportEnrollmentTemplate);
 router.post('/enrollment/import', upload.single('file'), excelController.importEnrollment);
+
+// Routes untuk Pemetaan CP (Rise Up! Bahasa Inggris)
+router.post('/import-pemetaan-cp', upload.single('file'), excelController.importPemetaanCp);
+router.get('/pemetaan-cp/:kelas/:semester', excelController.getPemetaanCpDetail);
 
 module.exports = router;
