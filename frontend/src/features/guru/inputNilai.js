@@ -456,7 +456,11 @@ const InputNilai = ({ activeTASemester, userId }) => {
     if (tpCount > 0 && uas !== null) {
       return (tpAverage * 0.7 + uas * 0.3).toFixed(2);
     }
-    
+
+    if (tpCount > 0) {
+      return tpAverage.toFixed(2);
+    }
+
     return '-';
   };
 

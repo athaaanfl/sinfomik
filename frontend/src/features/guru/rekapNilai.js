@@ -1071,6 +1071,8 @@ const RekapNilai = ({ activeTASemester, userId }) => {
         let finalGrade = '-';
         if (tpGrades.length > 0 && typeof uasValue === 'number') {
           finalGrade = (tpAverage * 0.7 + uasValue * 0.3).toFixed(2);
+        } else if (tpGrades.length > 0) {
+          finalGrade = tpAverage.toFixed(2);
         }
 
         // Determine final KKM
