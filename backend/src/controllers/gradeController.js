@@ -256,7 +256,7 @@ exports.exportGradeTemplate = async (req, res) => {
             const uasLetter = String.fromCharCode(64 + uasCol);
             
             const avgTpFormula = `AVERAGE(${tpStartLetter}${rowNum}:${tpEndLetter}${rowNum})`;
-            const finalFormula = `IF(OR(${uasLetter}${rowNum}="",COUNTBLANK(${tpStartLetter}${rowNum}:${tpEndLetter}${rowNum})=${tpColumns.length}),"",ROUND(${avgTpFormula}*0.7+${uasLetter}${rowNum}*0.3,2))`;
+            const finalFormula = `IF(COUNTBLANK(${tpStartLetter}${rowNum}:${tpEndLetter}${rowNum})=${tpColumns.length},"",IF(${uasLetter}${rowNum}="",ROUND(${avgTpFormula},2),ROUND(${avgTpFormula}*0.7+${uasLetter}${rowNum}*0.3,2)))`;
             
             rowValues.push({ formula: finalFormula });
             
@@ -866,8 +866,8 @@ exports.exportFinalGrades = async (req, res) => {
             const uasCol = String.fromCharCode(69 + tpList.length); // Column after Rata-rata TP
             rowData.push(studentGrades.UAS !== undefined ? studentGrades.UAS : '');
             
-            // Nilai Akhir: (70% Rata TP + 30% UAS)
-            const nilaiAkhirFormula = `(${rataRataCol}${currentRow}*0.7)+(${uasCol}${currentRow}*0.3)`;
+            // Nilai Akhir: 70% Rata TP + 30% UAS, atau rata-rata TP saja jika UAS kosong
+            const nilaiAkhirFormula = `IF(${rataRataCol}${currentRow}="","",IF(${uasCol}${currentRow}="",${rataRataCol}${currentRow},${rataRataCol}${currentRow}*0.7+${uasCol}${currentRow}*0.3))`;
             rowData.push({ formula: nilaiAkhirFormula });
             
             const row = worksheet.addRow(rowData);
